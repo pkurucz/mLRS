@@ -84,6 +84,10 @@
 #include "tx-hal-radiomaster-bandit-micro-900-esp32.h"
 #endif
 
+#ifdef TX_ELRS_RADIOMASTER_RANGER_MICRO_2400_ESP32
+#include "tx-hal-radiomaster-ranger-micro-2400-esp32.h"
+#endif
+
 
 // -- DIY
 
