@@ -97,6 +97,17 @@
 #endif
 
 
+// -- PKURUCZ Hardware
+
+#ifdef RX_PKURUCZ_TD_PA_2400_ESP32S3
+#include "rx-hal-pkurucz-td-pa-2400-esp32s3.h"
+#endif
+
+#ifdef TX_PKURUCZ_TD_PA_2400_ESP32S3
+#include "tx-hal-pkurucz-td-pa-2400-esp32s3.h"
+#endif
+
+
 // -- DIY
 
 #ifdef RX_DIY_DEV_900_ESP8266

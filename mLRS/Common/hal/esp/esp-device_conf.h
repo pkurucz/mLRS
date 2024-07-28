@@ -172,6 +172,21 @@
   #define FREQUENCY_BAND_915_MHZ_FCC
 #endif
 
+// -- PKURUCZ Hardware
+
+#ifdef RX_PKURUCZ_TD_PA_2400_ESP32S3
+  #define DEVICE_NAME "PK TD PA 2.4G S3"
+  #define DEVICE_IS_RECEIVER
+  #define DEVICE_HAS_SX128x
+  #define FREQUENCY_BAND_2P4_GHZ
+#endif
+
+#ifdef TX_PKURUCZ_TD_PA_2400_ESP32S3
+  #define DEVICE_NAME "PK TD PA 2.4G S3"
+  #define DEVICE_IS_TRANSMITTER
+  #define DEVICE_HAS_SX128x
+  #define FREQUENCY_BAND_2P4_GHZ
+#endif
 
 // -- DIY
 
