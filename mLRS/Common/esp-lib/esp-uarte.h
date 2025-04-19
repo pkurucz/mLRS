@@ -12,11 +12,6 @@
 #ifndef ESPLIB_UARTE_H
 #define ESPLIB_UARTE_H
 
-#ifdef ESP32
-#include "driver/uart.h"
-#include "hal/uart_ll.h"
-#endif
-
 
 //-------------------------------------------------------
 // Enums
@@ -44,23 +39,11 @@ typedef enum {
 //-------------------------------------------------------
 
 #ifdef UARTE_USE_SERIAL
-  #ifdef ESP32
-    #define UARTE_SERIAL_NO     UART_NUM_0
-  #elif defined ESP8266
-    #define UARTE_SERIAL_NO     Serial
-  #endif
+  #define UARTE_SERIAL_NO       Serial
 #elif defined UARTE_USE_SERIAL1
-  #ifdef ESP32
-    #define UARTE_SERIAL_NO     UART_NUM_1
-  #elif defined ESP8266
-    #define UARTE_SERIAL_NO     Serial1
-  #endif
+  #define UARTE_SERIAL_NO       Serial1
 #elif defined UARTE_USE_SERIAL2
-  #ifdef ESP32
-    #define UARTE_SERIAL_NO     UART_NUM_2
-  #else
-    #error ESP8266 has no SERIAL2!
-  #endif
+  #define UARTE_SERIAL_NO       Serial2
 #else
   #error UARTE_SERIAL_NO must be defined!
 #endif
@@ -73,11 +56,11 @@ typedef enum {
 #endif
 
 #ifdef ESP32
-  #if (UARTE_TXBUFSIZE > 0) && (UARTE_TXBUFSIZE < 256) 
+  #if (UARTE_TXBUFSIZE > 0) && (UARTE_TXBUFSIZE < 256)
     #error UARTE_TXBUFSIZE must be 0 or >= 256
   #endif
-  #if (UARTE_RXBUFSIZE < 256) 
-    #error UARTE_RXBUFSIZE must be >= 256
+  #if (UARTE_RXBUFSIZE > 0) && (UARTE_RXBUFSIZE < 256)
+    #error UARTE_TXBUFSIZE must be 0 or >= 256
   #endif
 #endif
 
@@ -88,11 +71,13 @@ typedef enum {
 
 IRAM_ATTR void uarte_putbuf(uint8_t* buf, uint16_t len)
 {
-#ifdef ESP32
-    uart_write_bytes(UARTE_SERIAL_NO, (uint8_t*)buf, len);
-#elif defined ESP8266
     UARTE_SERIAL_NO.write((uint8_t*)buf, len);
-#endif
+}
+
+
+IRAM_ATTR uint16_t uarte_tx_notfull(void)
+{
+    return 1; // fifo not full
 }
 
 
@@ -112,47 +97,30 @@ IRAM_ATTR void uarte_tx_flush(void)
 
 IRAM_ATTR char uarte_getc(void)
 {
-#ifdef ESP32
-    uint8_t c = 0;
-    uart_read_bytes(UARTE_SERIAL_NO, &c, 1, 0);
-    return (char)c;
-#elif defined ESP8266
     return (char)UARTE_SERIAL_NO.read();
-#endif
+}
+
+IRAM_ATTR void uarte_getbuf(char* buf, uint16_t len)
+{
+    UARTE_SERIAL_NO.readBytes(buf, len);
 }
 
 
 IRAM_ATTR void uarte_rx_flush(void)
 {
-#ifdef ESP32
-    uart_flush(UARTE_SERIAL_NO);
-#elif defined ESP8266
     while (UARTE_SERIAL_NO.available() > 0) UARTE_SERIAL_NO.read();
-#endif
 }
 
 
 IRAM_ATTR uint16_t uarte_rx_bytesavailable(void)
 {
-#ifdef ESP32
-    uint32_t available = 0;
-    uart_get_buffered_data_len(UARTE_SERIAL_NO, &available);
-    return (uint16_t)available;
-#elif defined ESP8266
     return (UARTE_SERIAL_NO.available() > 0) ? UARTE_SERIAL_NO.available() : 0;
-#endif
 }
 
 
 IRAM_ATTR uint16_t uarte_rx_available(void)
 {
-#ifdef ESP32
-    uint32_t available = 0;
-    uart_get_buffered_data_len(UARTE_SERIAL_NO, &available);
-    return (available > 0) ? 1 : 0;
-#elif defined ESP8266
     return (UARTE_SERIAL_NO.available() > 0) ? 1 : 0;
-#endif
 }
 
 
@@ -166,44 +134,38 @@ IRAM_ATTR uint16_t uarte_rx_available(void)
 void _uarte_initit(uint32_t baud, UARTPARITYENUM parity, UARTSTOPBITENUM stopbits)
 {
 #ifdef ESP32
+    UARTE_SERIAL_NO.setTxBufferSize(UARTE_TXBUFSIZE);
+    UARTE_SERIAL_NO.setRxBufferSize(UARTE_RXBUFSIZE);
 
-    uart_parity_t _parity = UART_PARITY_DISABLE;
+    uint32_t config = SERIAL_8N1;
     switch (parity) {
         case XUART_PARITY_NO:
-            _parity = UART_PARITY_DISABLE; break;
+            switch (stopbits) {
+                case UART_STOPBIT_1: config = SERIAL_8N1; break;
+                case UART_STOPBIT_2: config = SERIAL_8N2; break;
+            }
+            break;
         case XUART_PARITY_EVEN:
-            _parity = UART_PARITY_EVEN; break;
+            switch (stopbits) {
+                case UART_STOPBIT_1: config = SERIAL_8E1; break;
+                case UART_STOPBIT_2: config = SERIAL_8E2; break;
+            }
+            break;
         case XUART_PARITY_ODD:
-            _parity = UART_PARITY_ODD; break;
+            switch (stopbits) {
+                case UART_STOPBIT_1: config = SERIAL_8O1; break;
+                case UART_STOPBIT_2: config = SERIAL_8O2; break;
+            }
+            break;
     }
-
-    uart_stop_bits_t _stopbits = UART_STOP_BITS_1;
-    switch (stopbits) {
-        case UART_STOPBIT_1:
-            _stopbits = UART_STOP_BITS_1; break;
-        case UART_STOPBIT_2:
-            _stopbits = UART_STOP_BITS_2; break;
-    }
-
-    uart_config_t config = {
-        .baud_rate  = (int)baud,
-        .data_bits  = UART_DATA_8_BITS,
-        .parity     = _parity,
-        .stop_bits  = _stopbits,
-        .flow_ctrl  = UART_HW_FLOWCTRL_DISABLE,
-    };
-
-    ESP_ERROR_CHECK(uart_param_config(UARTE_SERIAL_NO, &config));
-
 #if defined UARTE_USE_TX_IO || defined UARTE_USE_RX_IO // both need to be defined
-    ESP_ERROR_CHECK(uart_set_pin(UARTE_SERIAL_NO, UARTE_USE_TX_IO, UARTE_USE_RX_IO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    UARTE_SERIAL_NO.begin(baud, config, UARTE_USE_RX_IO, UARTE_USE_TX_IO);
 #else
-    ESP_ERROR_CHECK(uart_set_pin(UARTE_SERIAL_NO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    UARTE_SERIAL_NO.begin(baud, config);
 #endif
 
-    ESP_ERROR_CHECK(uart_driver_install(UARTE_SERIAL_NO, UARTE_RXBUFSIZE, UARTE_TXBUFSIZE, 0, NULL, 0)); // rx buf size needs to be > 128
-    ESP_ERROR_CHECK(uart_set_rx_full_threshold(UARTE_SERIAL_NO, 8)); // default is 120 which is too much, buffer only 128 bytes
-    ESP_ERROR_CHECK(uart_set_rx_timeout(UARTE_SERIAL_NO, 1)); // wait for 1 symbol (~11 bits) to trigger Rx ISR, default 2
+    UARTE_SERIAL_NO.setRxFIFOFull(8);  // > 57600 baud sets to 120 which is too much, buffer only 128 bytes
+    UARTE_SERIAL_NO.setRxTimeout(1);   // wait for 1 symbol (~11 bits) to trigger Rx ISR, default 2
 
 #elif defined ESP8266
     UARTE_SERIAL_NO.setRxBufferSize(UARTE_RXBUFSIZE);
@@ -214,48 +176,21 @@ void _uarte_initit(uint32_t baud, UARTPARITYENUM parity, UARTSTOPBITENUM stopbit
 
 void uarte_setbaudrate(uint32_t baud)
 {
-#ifdef ESP32
-    ESP_ERROR_CHECK(uart_driver_delete(UARTE_SERIAL_NO));
-#elif defined ESP8266
     UARTE_SERIAL_NO.end();
-#endif
     _uarte_initit(baud, XUART_PARITY_NO, UART_STOPBIT_1);
 }
 
 
 void uarte_setprotocol(uint32_t baud, UARTPARITYENUM parity, UARTSTOPBITENUM stopbits)
 {
-#ifdef ESP32
-    ESP_ERROR_CHECK(uart_driver_delete(UARTE_SERIAL_NO));
-#elif defined ESP8266
     UARTE_SERIAL_NO.end();
-#endif
     _uarte_initit(baud, parity, stopbits);
-}
-
-
-void uarte_tx_enablepin(FunctionalState flag) {} // not supported
-
-
-void uarte_rx_enableisr(FunctionalState flag) 
-{
-#ifdef ESP32
-    if (flag == ENABLE) {
-        ESP_ERROR_CHECK(uart_enable_rx_intr(UARTE_SERIAL_NO));    
-    } else {
-        ESP_ERROR_CHECK(uart_disable_rx_intr(UARTE_SERIAL_NO));    
-    }
-#endif    
 }
 
 
 void uarte_init_isroff(void)
 {
-#ifdef ESP32
-    ESP_ERROR_CHECK(uart_driver_delete(UARTE_SERIAL_NO));
-#elif defined ESP8266
     UARTE_SERIAL_NO.end();
-#endif
     _uarte_initit(UARTE_BAUD, XUART_PARITY_NO, UART_STOPBIT_1);
 }
 
@@ -263,7 +198,12 @@ void uarte_init_isroff(void)
 void uarte_init(void)
 {
     uarte_init_isroff();
-    // isr is enabled !    
+    // isr is enabled !
+}
+
+void uarte_rx_enableisr(FunctionalState flag)
+{
+    // not supported on ESP, allows in functionality without lots of ifdefs
 }
 
 
@@ -271,7 +211,7 @@ void uarte_init(void)
 // System bootloader
 //-------------------------------------------------------
 // ESP8266, ESP32 can't reboot into system bootloader
-  
+
 IRAM_ATTR uint8_t uarte_has_systemboot(void)
 {
     return 0;

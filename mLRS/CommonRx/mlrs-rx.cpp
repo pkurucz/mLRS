@@ -18,11 +18,11 @@
 #define CLOCK_IRQ_PRIORITY          10
 #define UARTB_IRQ_PRIORITY          11 // serial
 #define UART_IRQ_PRIORITY           12 // out pin
-#define UARTC_IRQ_PRIORITY          11 // debug
+#define UARTF_IRQ_PRIORITY          11 // debug
 #define SX_DIO_EXTI_IRQ_PRIORITY    13
 #define SX2_DIO_EXTI_IRQ_PRIORITY   13 // on single spi diversity systems must be equal to DIO priority
 #define SWUART_TIM_IRQ_PRIORITY      9 // debug on swuart
-#define BUZZER_TIM_IRQ_PRIORITY     14
+#define FDCAN_IRQ_PRIORITY          14
 
 #include "../Common/common_conf.h"
 #include "../Common/common_types.h"
@@ -45,7 +45,7 @@
 #ifdef DEVICE_HAS_DEBUG_SWUART
 #include "../Common/esp-lib/esp-uart-sw.h"
 #else
-#include "../Common/esp-lib/esp-uartc.h"
+#include "../Common/esp-lib/esp-uartf.h"
 #endif
 #endif
 #include "../Common/hal/esp-timer.h"
@@ -77,7 +77,7 @@
 #ifdef DEVICE_HAS_DEBUG_SWUART
 #include "../modules/stm32ll-lib/src/stdstm32-uart-sw.h"
 #else
-#include "../modules/stm32ll-lib/src/stdstm32-uartc.h"
+#include "../modules/stm32ll-lib/src/stdstm32-uartf.h"
 #endif
 #endif
 #ifdef USE_I2C
@@ -95,6 +95,8 @@
 #include "../Common/common.h"
 #include "../Common/diversity.h"
 #include "../Common/arq.h"
+#include "../Common/rf_power.h"
+//#include "../Common/time_stats.h" // un-comment if you want to use
 //#include "../Common/test.h" // un-comment if you want to compile for board test
 
 #include "out_interface.h" // this includes uart.h, out.h, declares tOut out
@@ -105,6 +107,7 @@ tPowerupCounter powerup;
 tRDiversity rdiversity;
 tTDiversity tdiversity;
 tTransmitArq tarq;
+tRfPower rfpower;
 
 
 // is required in bind.h
@@ -112,16 +115,24 @@ void clock_reset(void) { rxclock.Reset(); }
 
 
 //-------------------------------------------------------
-// MAVLink
+// MAVLink & MSP & DroneCAN
 //-------------------------------------------------------
 
 #include "mavlink_interface_rx.h"
 
 tRxMavlink mavlink;
 
+#include "msp_interface_rx.h"
+
+tRxMsp msp;
+
 #include "sx_serial_interface_rx.h"
 
 tRxSxSerial sx_serial;
+
+#include "dronecan_interface_rx.h"
+
+tRxDroneCan dronecan;
 
 
 //-------------------------------------------------------
@@ -150,6 +161,9 @@ void init_hw(void)
     powerup.Init();
 
     rxclock.Init(Config.frame_rate_ms); // rxclock needs Config, so call after setup_init()
+
+    dronecan.Init(Setup.Rx.SerialPort == RX_SERIAL_PORT_CAN); // after delay_init() since it needs delay
+    serial.SetSerialIsSource(Setup.Rx.SerialPort != RX_SERIAL_PORT_CAN);
 }
 
 
@@ -234,7 +248,7 @@ void link_task_reset(void)
 }
 
 
-void process_received_txcmdframe(tTxFrame* frame)
+void process_received_txcmdframe(tTxFrame* const frame)
 {
 tCmdFrameHeader* head = (tCmdFrameHeader*)(frame->payload);
 
@@ -261,7 +275,7 @@ tCmdFrameHeader* head = (tCmdFrameHeader*)(frame->payload);
 }
 
 
-void pack_rxcmdframe(tRxFrame* frame, tFrameStats* frame_stats)
+void pack_rxcmdframe(tRxFrame* const frame, tFrameStats* const frame_stats)
 {
     switch (link_task) {
     case LINK_TASK_RX_SEND_RX_SETUPDATA:
@@ -344,12 +358,15 @@ uint8_t payload_len = 0;
 }
 
 
-void process_received_frame(bool do_payload, tTxFrame* frame)
+void process_received_frame(bool do_payload, tTxFrame* const frame)
 {
     stats.received_antenna = frame->status.antenna;
     stats.received_transmit_antenna = frame->status.transmit_antenna;
     stats.received_rssi = rssi_i8_from_u7(frame->status.rssi_u7);
-    // stats.received_LQ_rc = frame->status.LQ_rc; // has no vaid data in Tx frame
+
+    stats.received_fhss_index_band = frame->status.fhss_index_band;
+    stats.received_fhss_index = frame->status.fhss_index;
+
     stats.received_LQ_serial = frame->status.LQ_serial;
 
     // copy rc1 data
@@ -371,10 +388,7 @@ void process_received_frame(bool do_payload, tTxFrame* frame)
 
     // output data on serial, but only if connected
     if (!connected()) return;
-    for (uint8_t i = 0; i < frame->status.payload_len; i++) {
-        uint8_t c = frame->payload[i];
-        sx_serial.putc(c);
-    }
+    sx_serial.putbuf(frame->payload, frame->status.payload_len);
 
     stats.bytes_received.Add(frame->status.payload_len);
     stats.serial_data_received.Inc();
@@ -501,6 +515,7 @@ uint8_t link_state;
 uint8_t connect_state;
 uint16_t connect_tmo_cnt;
 uint8_t connect_sync_cnt;
+uint8_t connect_fhss_index_band_seen;
 uint8_t connect_listen_cnt;
 bool connect_occured_once;
 
@@ -540,6 +555,7 @@ RESTARTCONTROLLER
     bind.Init();
     fhss.Init(&Config.Fhss, &Config.Fhss2);
     fhss.Start();
+    rfpower.Init();
 
     sx.SetRfFrequency(fhss.GetCurrFreq());
     sx2.SetRfFrequency(fhss.GetCurrFreq2());
@@ -547,8 +563,9 @@ RESTARTCONTROLLER
     link_state = LINK_STATE_RECEIVE;
     connect_state = CONNECT_STATE_LISTEN;
     connect_tmo_cnt = 0;
-    connect_listen_cnt = 0;
     connect_sync_cnt = 0;
+    connect_fhss_index_band_seen = 0;
+    connect_listen_cnt = 0;
     connect_occured_once = false;
     link_rx1_status = link_rx2_status = RX_STATUS_NONE;
     link_task_init();
@@ -563,18 +580,19 @@ RESTARTCONTROLLER
 
     out.Configure(Setup.Rx.OutMode);
     mavlink.Init();
+    msp.Init();
     sx_serial.Init();
     fan.SetPower(sx.RfPower_dbm());
+    dronecan.Start();
 
     tick_1hz = 0;
     tick_1hz_commensurate = 0;
-    doSysTask = 0; // helps in avoiding too short first loop
+    resetSysTask(); // helps in avoiding too short first loop
 INITCONTROLLER_END
 
     //-- SysTask handling
 
-    if (doSysTask) {
-        doSysTask = 0;
+    if (doSysTask()) {
 
         if (connect_tmo_cnt) {
             connect_tmo_cnt--;
@@ -585,6 +603,10 @@ INITCONTROLLER_END
         DECc(tick_1hz, SYSTICK_DELAY_MS(1000));
 
         if (!connect_occured_once) bind.AutoBind();
+        bind.Tick_ms();
+        fan.SetPower(sx.RfPower_dbm());
+        fan.Tick_ms();
+        dronecan.Tick_ms();
 
         if (!tick_1hz) {
             dbg.puts(".");
@@ -625,9 +647,11 @@ INITCONTROLLER_END
         break;
 
     case LINK_STATE_TRANSMIT:
+        rfpower.Update();
         do_transmit(tdiversity.Antenna());
         link_state = LINK_STATE_TRANSMIT_WAIT;
         irq_status = irq2_status = 0; // important, in low connection condition, RxDone isr could trigger
+        DBG_MAIN_SLIM(dbg.puts("t");)
         break;
     }//end of switch(link_state)
 
@@ -650,7 +674,7 @@ IF_SX(
             }
         }
 
-        if (irq_status) { // this should not happen
+        if (irq_status) { // these should not happen
             if (irq_status & SX_IRQ_TIMEOUT) {
                 FAIL_WSTATE(BLINK_COMMON, "IRQ TMO FAIL", irq_status, link_state, link_rx1_status, link_rx2_status);
             }
@@ -705,8 +729,6 @@ IF_SX2(
 );
 
     // this happens ca 1 ms after a frame was or should have been received
-    uint8_t link_state_before = link_state; // to detect changes in link state
-
     if (doPostReceive) {
         doPostReceive = false;
 
@@ -738,7 +760,6 @@ dbg.puts(s8toBCD_s(stats.last_rssi2));*/
                 antenna = ANTENNA_2;
             }
             handle_receive(antenna);
-//dbg.puts(" a "); dbg.puts((antenna == ANTENNA_1) ? "1 " : "2 ");
         } else {
             handle_receive_none();
         }
@@ -754,6 +775,30 @@ dbg.puts(s8toBCD_s(stats.last_rssi2));*/
         // serial data is received if !IsInBind() && RX_STATUS_VALID && !FRAME_TYPE_TX_RX_CMD && connected()
         if (!valid_frame_received) {
             mavlink.FrameLost();
+            msp.FrameLost();
+        }
+
+        // check fhss index
+        // do it only in LISTEN and SYNC
+        if ((connect_state <= CONNECT_STATE_SYNC) && valid_frame_received &&
+            (stats.received_fhss_index < 63)) { // older version don't offer this
+            if (stats.received_fhss_index_band == 0) {
+                if (fhss.GetCurrI() != stats.received_fhss_index) { // somehow wrong frequency, discard
+                    valid_frame_received = false;
+                    invalid_frame_received = true;
+                    fhss.SetCurrI(stats.received_fhss_index); // set 1st band, should only happen for dual band
+                } else { // ok
+                    connect_fhss_index_band_seen |= 0x01; // 0 seen
+                }
+            } else {
+                if (fhss.GetCurrI2() != stats.received_fhss_index) { // somehow wrong frequency, so discard
+                    valid_frame_received = false;
+                    invalid_frame_received = true;
+                    fhss.SetCurrI2(stats.received_fhss_index); // set 2nd band, should only happen for dual band
+                } else { // ok
+                    connect_fhss_index_band_seen |= 0x02; // 1 seen
+                }
+            }
         }
 
         if (valid_frame_received) { // valid frame received
@@ -761,10 +806,18 @@ dbg.puts(s8toBCD_s(stats.last_rssi2));*/
             case CONNECT_STATE_LISTEN:
                 connect_state = CONNECT_STATE_SYNC;
                 connect_sync_cnt = 0;
+                connect_fhss_index_band_seen = (stats.received_fhss_index < 63) ? 0 : 0x03;
                 break;
             case CONNECT_STATE_SYNC:
                 connect_sync_cnt++;
-                if (connect_sync_cnt >= CONNECT_SYNC_CNT) {
+                uint8_t connect_sync_cnt_max = CONNECT_SYNC_CNT;
+                if (!connect_occured_once) {
+                    connect_sync_cnt_max = Config.connect_sync_cnt_max;
+                }
+                if ((connect_sync_cnt >= connect_sync_cnt_max) && (connect_fhss_index_band_seen != 0x03)) {
+                    connect_sync_cnt = connect_sync_cnt_max - 1; // not yet
+                }
+                if (connect_sync_cnt >= connect_sync_cnt_max) {
                     connect_state = CONNECT_STATE_CONNECTED;
                     connect_occured_once = true;
                 }
@@ -788,7 +841,9 @@ dbg.puts(s8toBCD_s(stats.last_rssi2));*/
                 connect_listen_cnt = 0;
                 link_state = LINK_STATE_RECEIVE; // switch back to RX
             }
-            if (fhss.HopToNextBind()) { link_state = LINK_STATE_RECEIVE; } // switch back to RX
+            if (fhss.HopToNextBind()) {
+                link_state = LINK_STATE_RECEIVE; // switch back to RX
+            }
         }
 
         // we just disconnected, or are in sync but don't receive anything
@@ -847,15 +902,15 @@ dbg.puts(s8toBCD_s(stats.last_rssi2));*/
             link_state = LINK_STATE_RECEIVE;
             break;
         case BIND_TASK_RX_STORE_PARAMS:
-            Setup.Common[0].FrequencyBand = fhss.GetCurrFrequencyBand();
+            Setup.Common[0].FrequencyBand = fhss.GetCurrBindSetupFrequencyBand();
             doParamsStore = true;
             break;
         }
 
         doPostReceive2_cnt = 5; // postpone this few loops, to allow link_state changes to be handled
-    }//end of if(doPostReceive)
 
-    if (link_state != link_state_before) return; // link state has changed, so process immediately
+        return; // link state may have changed, process immediately
+    }//end of if(doPostReceive)
 
     //-- Update channels, Out handling, etc
 
@@ -871,21 +926,29 @@ dbg.puts(s8toBCD_s(stats.last_rssi2));*/
             out.SendRcData(&rcData, frame_missed, false, stats.GetLastRssi(), stats.GetLQ_rc());
             out.SendLinkStatistics();
             mavlink.SendRcData(out.GetRcDataPtr(), frame_missed, false);
+            msp.SendRcData(out.GetRcDataPtr(), frame_missed, false);
+            dronecan.SendRcData(out.GetRcDataPtr(), false);
+            rfpower.Set(&rcData, Setup.Rx.PowerSwitchChannel, Setup.Rx.Power);
         } else {
             if (connect_occured_once) {
                 // generally output a signal only if we had a connection at least once
                 out.SendRcData(&rcData, true, true, RSSI_MIN, 0);
                 out.SendLinkStatisticsDisconnected();
                 mavlink.SendRcData(out.GetRcDataPtr(), true, true);
+                msp.SendRcData(out.GetRcDataPtr(), true, true);
+                dronecan.SendRcData(out.GetRcDataPtr(), true);
             }
+            rfpower.Set(Setup.Rx.Power); // force to Setup Power
         }
     }//end of if(doPostReceive2)
 
     out.Do();
 
-    //-- Do MAVLink
+    //-- Do MAVLink & MSP & DroneCAN
 
     mavlink.Do();
+    msp.Do();
+    dronecan.Do();
 
     //-- Store parameters
 

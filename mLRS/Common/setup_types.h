@@ -23,7 +23,8 @@
 
 //-- common to Tx & Rx
 
-typedef enum {
+// these are the frequency band options available to the user
+typedef enum : uint8_t {
     SETUP_FREQUENCY_BAND_2P4_GHZ = 0,
     SETUP_FREQUENCY_BAND_915_MHZ_FCC,
     SETUP_FREQUENCY_BAND_868_MHZ,
@@ -34,12 +35,27 @@ typedef enum {
 } SETUP_FREQUENCY_BAND_ENUM;
 
 
+// these are the frequency band options available to the hardware
+// used in the SX12xx drivers and FHSS class
+// should not be defined here, but we do here for convenience
+typedef enum : uint8_t {
+    SX_FHSS_CONFIG_FREQUENCY_BAND_2P4_GHZ = 0,
+    SX_FHSS_CONFIG_FREQUENCY_BAND_915_MHZ_FCC,
+    SX_FHSS_CONFIG_FREQUENCY_BAND_868_MHZ,
+    SX_FHSS_CONFIG_FREQUENCY_BAND_866_MHZ_IN,
+    SX_FHSS_CONFIG_FREQUENCY_BAND_433_MHZ,
+    SX_FHSS_CONFIG_FREQUENCY_BAND_70_CM_HAM,
+    SX_FHSS_CONFIG_FREQUENCY_BAND_NUM,
+} SX_FHSS_CONFIG_FREQUENCY_BAND_ENUM;
+
+
 typedef enum {
     MODE_50HZ = 0,
     MODE_31HZ,
     MODE_19HZ,
     MODE_FLRC_111HZ,
     MODE_FSK_50HZ,
+    MODE_19HZ_7X,
     MODE_NUM,
 } MODE_ENUM;
 
@@ -97,6 +113,7 @@ typedef enum {
     SERIAL_LINK_MODE_MAVLINK,
 #ifdef USE_FEATURE_MAVLINKX
     SERIAL_LINK_MODE_MAVLINK_X,
+    SERIAL_LINK_MODE_MSP_X,
 #endif
     SERIAL_LINK_MODE_NUM,
 } SERIAL_LINK_MODE_ENUM;
@@ -104,8 +121,10 @@ typedef enum {
 
 #ifndef USE_FEATURE_MAVLINKX
   #define SERIAL_LINK_MODE_IS_MAVLINK(x)  ((x) == SERIAL_LINK_MODE_MAVLINK)
+  #define SERIAL_LINK_MODE_IS_MSP(x)      (false)
 #else
   #define SERIAL_LINK_MODE_IS_MAVLINK(x)  ((x) == SERIAL_LINK_MODE_MAVLINK || (x) == SERIAL_LINK_MODE_MAVLINK_X)
+  #define SERIAL_LINK_MODE_IS_MSP(x)      ((x) == SERIAL_LINK_MODE_MSP_X)
 #endif
 
 
@@ -129,6 +148,24 @@ typedef enum {
     RX_SEND_RADIO_STATUS_METHOD_PX4,
     RX_SEND_RADIO_STATUS_NUM,
 } RX_SEND_RADIO_STATUS_ENUM;
+
+
+typedef enum {
+    POWER_SWITCH_CHANNEL_OFF = 0,
+    POWER_SWITCH_CHANNEL_CH5,
+    POWER_SWITCH_CHANNEL_CH6,
+    POWER_SWITCH_CHANNEL_CH7,
+    POWER_SWITCH_CHANNEL_CH8,
+    POWER_SWITCH_CHANNEL_CH9,
+    POWER_SWITCH_CHANNEL_CH10,
+    POWER_SWITCH_CHANNEL_CH11,
+    POWER_SWITCH_CHANNEL_CH12,
+    POWER_SWITCH_CHANNEL_CH13,
+    POWER_SWITCH_CHANNEL_CH14,
+    POWER_SWITCH_CHANNEL_CH15,
+    POWER_SWITCH_CHANNEL_CH16,
+    POWER_SWITCH_CHANNEL_NUM,
+} POWER_SWITCH_CHANNEL_ENUM;
 
 
 //-- Tx only
@@ -171,19 +208,36 @@ typedef enum {
 
 
 typedef enum {
-    CLI_LINE_END_CR = 0,
-    CLI_LINE_END_LF,
-    CLI_LINE_END_CRLF,
-    CLI_LINE_END_NUM,
-} TX_CLI_LINE_END_ENUM;
-
-
-typedef enum {
     BUZZER_OFF = 0,
     BUZZER_LOST_PACKETS,
     BUZZER_RX_LQ,
     BUZZER_NUM,
 } TX_BUZZER_END_ENUM;
+
+
+typedef enum {
+    WIFI_PROTOCOL_TCP = 0,
+    WIFI_PROTOCOL_UDP,
+    WIFI_PROTOCOL_BT,
+    WIFI_PROTOCOL_NUM,
+} TX_WIFI_PROTOCOL_ENUM;
+
+
+typedef enum {
+    WIFI_CHANNEL_1 = 0,
+    WIFI_CHANNEL_6,
+    WIFI_CHANNEL_11,
+    WIFI_CHANNEL_13,
+    WIFI_CHANNEL_NUM,
+} TX_WIFI_CHANNEL_ENUM;
+
+
+typedef enum {
+    WIFI_POWER_LOW = 0,
+    WIFI_POWER_MED,
+    WIFI_POWER_MAX,
+    WIFI_POWER_NUM,
+} TX_WIFI_POWER_ENUM;
 
 
 //-- Rx only
@@ -232,6 +286,13 @@ typedef enum {
 } RX_SEND_RCCHANNELS_ENUM;
 
 
+typedef enum {
+    RX_SERIAL_PORT_SERIAL = 0,
+    RX_SERIAL_PORT_CAN,
+    RX_SERIAL_PORT_NUM,
+} RX_SERIAL_PORT_ENUM;
+
+
 //-------------------------------------------------------
 // Config Enums
 //-------------------------------------------------------
@@ -258,6 +319,13 @@ typedef enum {
 } SX126x_LORA_CONFIG_ENUM;
 
 
+typedef enum {
+    LR11xx_LORA_CONFIG_BW500_SF5_CR4_5 = 0,
+    LR11xx_LORA_CONFIG_BW500_SF6_CR4_5,
+    LR11xx_LORA_CONFIG_NUM,
+} LR11xx_LORA_CONFIG_ENUM;
+
+
 //-------------------------------------------------------
 // Setup Types
 // ATTENTION: only extend/append, never change sequence
@@ -266,7 +334,7 @@ typedef enum {
 typedef struct
 {
     char BindPhrase[6+1];
-    uint8_t FrequencyBand;
+    SETUP_FREQUENCY_BAND_ENUM FrequencyBand;
     uint8_t Mode;
     uint8_t Ortho;
 
@@ -286,10 +354,14 @@ typedef struct
     uint8_t __SerialLinkMode; // deprecated, substituted by Rx.SerialLinkMode
     uint8_t SendRadioStatus;
     uint8_t Buzzer;
-    uint8_t CliLineEnd;
+    uint8_t __CliLineEnd; // deprecated
     uint8_t MavlinkComponent;
+    uint8_t PowerSwitchChannel;
+    uint8_t WifiProtocol;
+    uint8_t WifiChannel;
+    uint8_t WifiPower;
 
-    uint8_t spare[8];
+    uint8_t spare[4];
 } tTxSetup; // 20 bytes
 
 
@@ -308,15 +380,19 @@ typedef struct
     uint8_t SendRcChannels;
     uint8_t __RadioStatusMethod; // deprecated
     uint8_t OutLqChannelMode;
+    uint8_t PowerSwitchChannel;
+    uint8_t SerialPort;
 
-    uint8_t spare[7];
+    uint8_t spare[5];
 
     int8_t FailsafeOutChannelValues_Ch1_Ch12[12]; // -120 .. +120
     uint8_t FailsafeOutChannelValues_Ch13_Ch16[4]; // 0,1,2 = -120, 0, +120
 } tRxSetup; // 36 bytes
 
 
-#define SETUP_MARKER_STR      "SetupStartMarker"
+#define SETUP_MARKER_RX_STR   "SetupStartStx4Rx"
+#define SETUP_MARKER_TX_STR   "SetupStartStx4Tx"
+#define SETUP_MARKER_OLD_STR  "SetupStartMarker"
 #define SETUP_MARKEREND_STR   "!end!"
 
 #define SETUP_CONFIG_NUM      10 // not more, so it's only one char '0'...'9'
@@ -332,7 +408,7 @@ typedef struct
     // parameters common to both Tx and Rx
     // deprecated
     char __BindPhrase[6+1];
-    uint8_t __FrequencyBand;
+    SETUP_FREQUENCY_BAND_ENUM __FrequencyBand;
     uint8_t __Mode;
 
     uint8_t _ConfigId; // strange name to avoid mistake
@@ -375,11 +451,12 @@ typedef struct
     char Rx_Power_optstr[44+1];
     uint16_t Rx_Diversity_allowed_mask;
     uint16_t Rx_OutMode_allowed_mask;
+    uint16_t Rx_SerialPort_allowed_mask;
 
     bool rx_available;
 
-    uint32_t rx_firmware_version;
-    uint16_t rx_setup_layout;
+    uint32_t rx_firmware_version; // 6.99.99 + enough head room
+    uint32_t rx_setup_layout; // 6.99.99 + enough head room
     char rx_device_name[20+1];
     int8_t rx_actual_power_dbm;
     uint8_t rx_actual_diversity;
@@ -393,7 +470,7 @@ typedef struct
     uint8_t LoraConfigIndex;
     uint32_t FlrcSyncWord;
     int8_t Power_dbm;
-    uint8_t FrequencyBand;
+    SX_FHSS_CONFIG_FREQUENCY_BAND_ENUM FrequencyBand;
     // helper
     bool is_lora;
     bool modeIsLora(void) { return is_lora; }
@@ -404,7 +481,7 @@ typedef struct
 {
     uint8_t Num;
     uint32_t Seed;
-    uint8_t FrequencyBand;
+    SX_FHSS_CONFIG_FREQUENCY_BAND_ENUM FrequencyBand;
     uint8_t Ortho;
     uint8_t Except;
     uint16_t FrequencyBand_allowed_mask; // copy of SetupMetaData for sx1, is modified for sx2
@@ -435,6 +512,7 @@ typedef struct
     uint16_t frame_rate_hz;
     uint16_t connect_tmo_systicks;
     uint16_t connect_listen_hop_cnt;
+    uint8_t connect_sync_cnt_max;
 
     uint8_t Diversity; // snapshot of Setup's Diversity at startup
     bool ReceiveUseAntenna1;

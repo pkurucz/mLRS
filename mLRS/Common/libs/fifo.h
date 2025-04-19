@@ -39,7 +39,7 @@ class tFifo
         return false;
     }
 
-    void PutBuf(void* buf, uint16_t len)
+    void PutBuf(void* const buf, uint16_t len)
     {
         for (uint16_t i = 0; i < len; i++) Put(((T*)buf)[i]);
     }
@@ -47,13 +47,18 @@ class tFifo
     uint16_t Available(void)
     {
         int16_t d = (int16_t)writepos - (int16_t)readpos;
-        if (d < 0) return d + (SIZEMASK + 1);
+        if (d < 0) return d + FIFO_SIZE; // was (SIZEMASK + 1);
         return d;
     }
 
     bool HasSpace(uint16_t space)
     {
         return (Available() < (FIFO_SIZE - space));
+    }
+
+    bool IsFull(void)
+    {
+        return (((writepos + 1) & (SIZEMASK)) == readpos);
     }
 
     T Get(void)

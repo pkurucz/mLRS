@@ -11,7 +11,7 @@
 #pragma once
 
 
-#if (defined DEVICE_HAS_JRPIN5)
+#ifdef DEVICE_HAS_JRPIN5
 
 #include "../Common/libs/fifo.h"
 #include "setup_tx.h"
@@ -38,24 +38,24 @@ class tMBridge : public tPin5BridgeBase, public tSerialBase
 {
   public:
     void Init(bool enable_flag, bool crsf_emulation_flag);
-    bool ChannelsUpdated(tRcData* rc);
-    bool TelemetryUpdate(uint8_t* task);
+    bool ChannelsUpdated(tRcData* const rc);
+    bool TelemetryUpdate(uint8_t* const task);
 
-    bool CommandReceived(uint8_t* cmd);
+    bool CommandReceived(uint8_t* const cmd);
     uint8_t* GetPayloadPtr(void);
     uint8_t GetModelId(void);
-    void SendCommand(uint8_t cmd, uint8_t* payload);
-    bool CommandInFifo(uint8_t* cmd);
+    void SendCommand(uint8_t cmd, uint8_t* const payload);
+    bool CommandInFifo(uint8_t* const cmd);
     void Lock(uint8_t cmd);
     void Unlock(void);
-    uint8_t HandleRequestCmd(uint8_t* payload);
+    uint8_t HandleRequestCmd(uint8_t* const payload);
     uint8_t HandleCmd(uint8_t cmd);
 
-    void ParseCrsfFrame(uint8_t* crsf, uint8_t len);
-    bool CrsfFrameAvailable(uint8_t** buf, uint8_t* len);
+    void ParseCrsfFrame(uint8_t* const crsf, uint8_t len);
+    bool CrsfFrameAvailable(uint8_t** const buf, uint8_t* const len);
 
     // helper
-    void fill_rcdata(tRcData* rc);
+    void fill_rcdata(tRcData* const rc);
 
     // for in-isr processing
     void parse_nextchar(uint8_t c) override;
@@ -79,7 +79,7 @@ class tMBridge : public tPin5BridgeBase, public tSerialBase
     // front end to communicate with mBridge
     // mimics a serial interface to the main code
     void putc(char c) { tx_fifo.Put(c); }
-    void putbuf(uint8_t* buf, uint16_t len) { tx_fifo.PutBuf(buf, len); }
+    void putbuf(uint8_t* const buf, uint16_t len) { tx_fifo.PutBuf(buf, len); }
     bool available(void) { return rx_fifo.Available(); }
     char getc(void) { return rx_fifo.Get(); }
     void flush(void) { rx_fifo.Flush(); }
@@ -98,6 +98,11 @@ class tMBridge : public tPin5BridgeBase, public tSerialBase
     uint8_t cmd_in_process;
     uint8_t ack_cmd;
     bool ack_ok;
+
+    // momentarily for debug, detect discarded bytes
+#ifdef USE_DEBUG
+    uint16_t discarded = 0;
+#endif
 };
 
 tMBridge mbridge;
@@ -107,14 +112,14 @@ tMBridge mbridge;
 // MBridge half-duplex interface, used for radio <-> mLRS tx module
 
 // to avoid error: ISO C++ forbids taking the address of a bound member function to form a pointer to member function
-void mbridge_uart_rx_callback(uint8_t c) { mbridge.uart_rx_callback(c); }
-void mbridge_uart_tc_callback(void) { mbridge.uart_tc_callback(); }
+void mbridge_pin5_rx_callback(uint8_t c) { mbridge.pin5_rx_callback(c); }
+void mbridge_pin5_tc_callback(void) { mbridge.pin5_tc_callback(); }
 
 
 // is called in isr context
 bool tMBridge::transmit_start(void)
 {
-if (crsf_emulation) while (1) {}; // must not happen
+    if (crsf_emulation) while(1){}; // must not happen
 
     tx_free = true; // tell external code that next slot can be filled
 
@@ -136,14 +141,16 @@ if (crsf_emulation) while (1) {}; // must not happen
 
 // is called in isr context
 // we can assume that there is at least one byte available
+// send in one chunk to help ensure it is transmitted with no gaps
 uint8_t tMBridge::send_serial(void)
 {
-    pin5_putc(0x00); // we can send anything we want which is not a command, send 0x00 so it is easy to recognize
-    for (uint8_t i = 0; i < MBRIDGE_M2R_SERIAL_PAYLOAD_LEN_MAX; i++) {
-        uint8_t c = serial_getc();
-        pin5_putc(c);
-        if (!serial_rx_available()) break;
+    uint8_t buf[MBRIDGE_M2R_SERIAL_PAYLOAD_LEN_MAX + 1];
+    uint8_t cnt = 0;
+    buf[cnt++] = 0x00; // we can send anything we want which is not a command, send 0x00 so it is easy to recognize
+    while (serial_rx_available() && cnt < (MBRIDGE_M2R_SERIAL_PAYLOAD_LEN_MAX + 1)) {
+        buf[cnt++] = serial_getc();
     }
+    pin5_putbuf(buf, cnt);
     return 1;
 }
 
@@ -151,17 +158,14 @@ uint8_t tMBridge::send_serial(void)
 // is called in isr context
 void tMBridge::send_command(void)
 {
-    for (uint8_t i = 0; i < cmd_m2r_available; i++) {
-        uint8_t c = cmd_m2r_frame[i];
-        pin5_putc(c);
-    }
+    pin5_putbuf(cmd_m2r_frame, cmd_m2r_available);
 }
 
 
 #define MBRIDGE_TMO_US  250
 
 
-// is called in isr context, or in ParseCrsfFrame() in case of CRSF emulatiom
+// is called in isr context, or in ParseCrsfFrame() in case of CRSF emulation
 void tMBridge::parse_nextchar(uint8_t c)
 {
     uint16_t tnow_us = micros16();
@@ -175,7 +179,20 @@ void tMBridge::parse_nextchar(uint8_t c)
 
     switch (state) {
     case STATE_IDLE:
-        if (c == MBRIDGE_STX1) state = STATE_RECEIVE_MBRIDGE_STX2;
+        if (c == MBRIDGE_STX1) {
+            state = STATE_RECEIVE_MBRIDGE_STX2;
+#ifdef USE_DEBUG
+            if (discarded) {
+                if (discarded > 1) {
+                    dbg.puts(u16toBCD_s(discarded));
+                    dbg.puts(" bytes lost!\n");
+                }
+                discarded = 0;
+            }
+        } else {
+            discarded++;
+#endif
+        }
         break;
 
     case STATE_RECEIVE_MBRIDGE_STX2:
@@ -240,7 +257,7 @@ void tMBridge::parse_nextchar(uint8_t c)
 //          ch16-17:  1 bit, 0 .. 1
 // rcData:            11 bit, 1 .. 1024 .. 2047 for +-120%
 
-void tMBridge::fill_rcdata(tRcData* rc)
+void tMBridge::fill_rcdata(tRcData* const rc)
 {
     rc->ch[0] = channels.ch0;
     rc->ch[1] = channels.ch1;
@@ -266,7 +283,7 @@ void tMBridge::fill_rcdata(tRcData* rc)
 //-------------------------------------------------------
 // CRSF MBridge emulation
 
-void tMBridge::ParseCrsfFrame(uint8_t* crsf, uint8_t len)
+void tMBridge::ParseCrsfFrame(uint8_t* const crsf, uint8_t len)
 {
     if (!crsf_emulation) return;
 
@@ -286,7 +303,7 @@ void tMBridge::ParseCrsfFrame(uint8_t* crsf, uint8_t len)
 }
 
 
-bool tMBridge::CrsfFrameAvailable(uint8_t** buf, uint8_t* len)
+bool tMBridge::CrsfFrameAvailable(uint8_t** const buf, uint8_t* const len)
 {
     if (!crsf_emulation) return false;
 
@@ -324,8 +341,8 @@ void tMBridge::Init(bool enable_flag, bool crsf_emulation_flag)
     cmd_in_process = 0;
 
     if (!crsf_emulation) {
-        uart_rx_callback_ptr = &mbridge_uart_rx_callback;
-        uart_tc_callback_ptr = &mbridge_uart_tc_callback;
+        uart_rx_callback_ptr = &mbridge_pin5_rx_callback;
+        uart_tc_callback_ptr = &mbridge_pin5_tc_callback;
 
         tPin5BridgeBase::Init();
         tSerialBase::Init();
@@ -334,9 +351,9 @@ void tMBridge::Init(bool enable_flag, bool crsf_emulation_flag)
 
 
 // polled in main loop
-bool tMBridge::ChannelsUpdated(tRcData* rc)
+bool tMBridge::ChannelsUpdated(tRcData* const rc)
 {
-if (crsf_emulation) return false; // CRSF: just don't ever do it, should not happen
+    if (crsf_emulation) return false; // CRSF: just don't ever do it, should not happen
 
     if (!enabled) return false;
 
@@ -351,9 +368,9 @@ if (crsf_emulation) return false; // CRSF: just don't ever do it, should not hap
 
 
 // polled in main loop
-bool tMBridge::TelemetryUpdate(uint8_t* task)
+bool tMBridge::TelemetryUpdate(uint8_t* const task)
 {
-if (crsf_emulation) return false; // CRSF: just don't ever do it, should not happen
+    if (crsf_emulation) return false; // CRSF: just don't ever do it, should not happen
 
     if (!enabled) return false;
 
@@ -385,7 +402,7 @@ if (crsf_emulation) return false; // CRSF: just don't ever do it, should not hap
 
 
 // polled in main loop
-bool tMBridge::CommandReceived(uint8_t* cmd)
+bool tMBridge::CommandReceived(uint8_t* const cmd)
 {
     if (!enabled) return false;
     if (!cmd_received) return false;
@@ -419,7 +436,7 @@ uint8_t tMBridge::GetModelId(void)
 } */
 
 
-void tMBridge::SendCommand(uint8_t cmd, uint8_t* payload)
+void tMBridge::SendCommand(uint8_t cmd, uint8_t* const payload)
 {
     memset(cmd_m2r_frame, 0, MBRIDGE_M2R_COMMAND_FRAME_LEN_MAX);
 
@@ -432,7 +449,7 @@ void tMBridge::SendCommand(uint8_t cmd, uint8_t* payload)
 }
 
 
-bool tMBridge::CommandInFifo(uint8_t* cmd)
+bool tMBridge::CommandInFifo(uint8_t* const cmd)
 {
     if (cmd_in_process) return false;
 
@@ -465,7 +482,7 @@ void mbridge_start_ParamRequestList(void);
 void mbridge_start_ParamRequestByIndex(uint8_t idx);
 
 
-uint8_t tMBridge::HandleRequestCmd(uint8_t* payload)
+uint8_t tMBridge::HandleRequestCmd(uint8_t* const payload)
 {
 tMBridgeRequestCmd* request = (tMBridgeRequestCmd*)payload;
 
@@ -569,8 +586,15 @@ tMBridgeInfo info = {};
 
     info.tx_config_id = Config.ConfigId;
 
-    info.receiver_sensitivity = sx.ReceiverSensitivity_dbm(); // is equal for Tx and Rx
-    info.tx_actual_power_dbm = sx.RfPower_dbm();
+    if (!TRANSMIT_USE_ANTENNA1) {
+        // Config.Diversity = DIVERSITY_ANTENNA2, DIVERSITY_R_ENABLED_T_ANTENNA2
+        info.receiver_sensitivity = sx2.ReceiverSensitivity_dbm();
+        info.tx_actual_power_dbm = sx2.RfPower_dbm();
+    } else {
+        // Config.Diversity = DIVERSITY_DEFAULT, DIVERSITY_ANTENNA1, DIVERSITY_R_ENABLED_T_ANTENNA1
+        info.receiver_sensitivity = sx.ReceiverSensitivity_dbm(); // is equal for Tx and Rx
+        info.tx_actual_power_dbm = sx.RfPower_dbm();
+    }
     info.tx_actual_diversity = Config.Diversity;
 
     if (SetupMetaData.rx_available) {
@@ -583,9 +607,13 @@ tMBridgeInfo info = {};
         info.rx_actual_diversity = DIVERSITY_NUM; // 5 = invalid
     }
 
-    // we try to also set the deprecated fields to something reasonable, to help with transition
-    info.__tx_actual_diversity = (info.tx_actual_diversity <= 2) ? info.tx_actual_diversity : 3;
-    info.__rx_actual_diversity = (info.rx_actual_diversity <= 2) ? info.rx_actual_diversity : 3;
+    info.has_status = 1; // to indicate it has these flags
+    info.binding = (bind.IsInBind()) ? 1 : 0;
+    info.connected = (connected()) ? 1 : 0;
+    info.rx_LQ_low = (stats.received_LQ_rc < 65) ? 1 : 0;
+    info.tx_LQ_low = (stats.GetLQ_serial() < 65) ? 1 : 0;
+
+    info.param_num = SETUP_PARAMETER_NUM; // known if non-zero
 
     mbridge.SendCommand(MBRIDGE_CMD_INFO, (uint8_t*)&info);
 }
@@ -596,7 +624,7 @@ void mbridge_send_DeviceItemTx(void)
 tMBridgeDeviceItem item = {};
 
     item.firmware_version_u16 = version_to_u16(VERSION);
-    item.setup_layout = SETUPLAYOUT;
+    item.setup_layout_u16 = version_to_u16(SETUPLAYOUT);
     strbufstrcpy(item.device_name_20, DEVICE_NAME, 20);
     mbridge.SendCommand(MBRIDGE_CMD_DEVICE_ITEM_TX, (uint8_t*)&item);
 }
@@ -608,11 +636,11 @@ tMBridgeDeviceItem item = {};
 
     if (SetupMetaData.rx_available) {
         item.firmware_version_u16 = version_to_u16(SetupMetaData.rx_firmware_version);
-        item.setup_layout = SetupMetaData.rx_setup_layout;
+        item.setup_layout_u16 = version_to_u16(SetupMetaData.rx_setup_layout);
         strbufstrcpy(item.device_name_20, SetupMetaData.rx_device_name, 20);
     } else {
         item.firmware_version_u16 = 0;
-        item.setup_layout = 0;
+        item.setup_layout_u16 = 0;
         strbufstrcpy(item.device_name_20, "", 20);
     }
     mbridge.SendCommand(MBRIDGE_CMD_DEVICE_ITEM_RX, (uint8_t*)&item);
@@ -622,11 +650,55 @@ tMBridgeDeviceItem item = {};
 uint8_t param_idx; // next param index to send
 uint8_t param_itemtype_to_send; // count through sending PARAM_ITEM, PARAM_ITEM2, PARAM_ITEM3
 bool param_by_index; // to indicate sending requested by list or by index
+char param_optstr[96]; // is currently limited to 67 max
 
 
 // we have to send (much) more than SETUP_PARAMETER_NUM PARAM_ITEM messages
 // since all parameters need 2 and some even 3 or 4 of them
 // currently it are about 80 for the 36 parameters => 80 x 20ms = 1600 ms
+
+// shorten parameter's option string, as follows:
+// - each not allowed option is replaced by a '-'
+// - keep however option for the current setting (this handles allowed mask = 0)
+void param_get_opt_shortened_str(char* const out, uint8_t param_idx)
+{
+    const char* optstr = SetupParameter[param_idx].optstr;
+    uint16_t allowed_mask = param_get_allowed_mask(param_idx);
+
+    if (SetupParameter[param_idx].type != SETUP_PARAM_TYPE_LIST || allowed_mask == UINT16_MAX) {
+        strcpy(out, optstr);
+        return;
+    }
+
+    uint8_t val = *(int8_t*)SetupParameterPtr(param_idx);
+
+    // we have something like "50 Hz,31 Hz,19 Hz,FLRC,FSK"
+    uint8_t out_pos = 0;
+    char s[24];
+    uint8_t pos = 0;
+    uint8_t opt_i = 0;
+    for (uint8_t n = 0; n < strlen(optstr) + 1; n++) {
+        s[pos++] = optstr[n];
+        if (optstr[n] == ',' || optstr[n] == '\0') {
+            if (opt_i == val || allowed_mask & (1 << opt_i)) { // is current selection or is allowed option, keep it
+                for (uint8_t i = 0; i < pos; i++) out[out_pos++] = s[i];
+            } else {
+                out[out_pos++] = '-';
+                out[out_pos++] = optstr[n]; // finish with ',' or '\0'
+            }
+            opt_i++;
+            pos = 0;
+            if (out_pos > 80) while(1){} // must not happen
+        }
+    }
+/*
+dbg.puts("\nparam   ");dbg.puts(SetupParameter[param_idx].name);
+dbg.puts("\n  idx   ");dbg.puts(u8toBCD_s(param_idx));
+dbg.puts("\n  opt   ");dbg.puts(optstr);
+dbg.puts("\n  mask x");dbg.puts(u16toHEX_s(allowed_mask));
+dbg.puts("\n  val   ");dbg.puts(u8toBCD_s(val));
+dbg.puts("\n->      ");dbg.puts(out);*/
+}
 
 
 void mbridge_start_ParamRequestByIndex(uint8_t idx)
@@ -665,21 +737,9 @@ void mbridge_send_ParamItem(void)
         tMBridgeParamItem item = {};
         item.index = param_idx;
         switch (SetupParameter[param_idx].type) {
-        case SETUP_PARAM_TYPE_UINT8:
-            item.type = MBRIDGE_PARAM_TYPE_UINT8;
-            item.value.u8 = *(uint8_t*)SetupParameterPtr(param_idx);
-            break;
         case SETUP_PARAM_TYPE_INT8:
             item.type = MBRIDGE_PARAM_TYPE_INT8;
             item.value.i8 = *(int8_t*)SetupParameterPtr(param_idx);
-            break;
-        case SETUP_PARAM_TYPE_UINT16:
-            item.type = MBRIDGE_PARAM_TYPE_UINT16;
-            item.value.u16 = *(uint16_t*)SetupParameterPtr(param_idx);
-            break;
-        case SETUP_PARAM_TYPE_INT16:
-            item.type = MBRIDGE_PARAM_TYPE_INT16;
-            item.value.i16 = *(int16_t*)SetupParameterPtr(param_idx);
             break;
         case SETUP_PARAM_TYPE_LIST:
             item.type = MBRIDGE_PARAM_TYPE_LIST;
@@ -696,33 +756,17 @@ void mbridge_send_ParamItem(void)
 
         param_itemtype_to_send = 1; // send the 2nd ParamItem in the next call
 
+        param_get_opt_shortened_str(param_optstr, param_idx); // set it for the next items
+
     } else
     if (param_itemtype_to_send == 1) {
         tMBridgeParamItem2 item2 = {};
         item2.index = param_idx;
         switch (SetupParameter[param_idx].type) {
-        case SETUP_PARAM_TYPE_UINT8:
-            item2.dflt.u8 = SetupParameter[param_idx].dflt.UINT8_value;
-            item2.min.u8 = SetupParameter[param_idx].min.UINT8_value;
-            item2.max.u8 = SetupParameter[param_idx].max.UINT8_value;
-            strbufstrcpy(item2.unit_6, SetupParameter[param_idx].unit, 6);
-            break;
         case SETUP_PARAM_TYPE_INT8:
             item2.dflt.i8 = SetupParameter[param_idx].dflt.INT8_value;
             item2.min.i8 = SetupParameter[param_idx].min.INT8_value;
             item2.max.i8 = SetupParameter[param_idx].max.INT8_value;
-            strbufstrcpy(item2.unit_6, SetupParameter[param_idx].unit, 6);
-            break;
-        case SETUP_PARAM_TYPE_UINT16:
-            item2.dflt.u16 = SetupParameter[param_idx].dflt.UINT16_value;
-            item2.min.u16 = SetupParameter[param_idx].min.UINT16_value;
-            item2.max.u16 = SetupParameter[param_idx].max.UINT16_value;
-            strbufstrcpy(item2.unit_6, SetupParameter[param_idx].unit, 6);
-            break;
-        case SETUP_PARAM_TYPE_INT16:
-            item2.dflt.i16 = SetupParameter[param_idx].dflt.INT16_value;
-            item2.min.i16 = SetupParameter[param_idx].min.INT16_value;
-            item2.max.i16 = SetupParameter[param_idx].max.INT16_value;
             strbufstrcpy(item2.unit_6, SetupParameter[param_idx].unit, 6);
             break;
         case SETUP_PARAM_TYPE_LIST:
@@ -731,8 +775,8 @@ void mbridge_send_ParamItem(void)
             } else {
                 item2.allowed_mask = UINT16_MAX;
             }
-            strbufstrcpy(item2.options_21, SetupParameter[param_idx].optstr, 21);
-            if (strlen(SetupParameter[param_idx].optstr) >= 21) item3_needed = true;
+            strbufstrcpy(item2.options_21, param_optstr, 21);
+            if (strlen(param_optstr) >= 21) item3_needed = true;
             break;
         }
 
@@ -751,9 +795,8 @@ void mbridge_send_ParamItem(void)
     if (param_itemtype_to_send == 2) {
         tMBridgeParamItem3 item3 = {};
         item3.index = param_idx;
-        strbufstrcpy(item3.options2_23, SetupParameter[param_idx].optstr + 21, 23);
-
-        if (strlen(SetupParameter[param_idx].optstr) >= 21+23) item3_needed = true; // we need yet another one
+        strbufstrcpy(item3.options2_23, param_optstr + 21, 23);
+        if (strlen(param_optstr) >= 21+23) item3_needed = true; // we need yet another one
 
         mbridge.SendCommand(MBRIDGE_CMD_PARAM_ITEM3, (uint8_t*)&item3);
 
@@ -771,7 +814,7 @@ void mbridge_send_ParamItem(void)
     if (param_itemtype_to_send >= 3) {
         tMBridgeParamItem3 item3 = {};
         item3.index = param_idx;
-        strbufstrcpy(item3.options2_23, SetupParameter[param_idx].optstr + 21 + 23, 23);
+        strbufstrcpy(item3.options2_23, param_optstr + 21 + 23, 23);
 
         // we would have to match MAVLink4OpenTx code
         // to avoid this let's play foul: set highest bit of index
@@ -835,7 +878,7 @@ void mbridge_send_cmd(uint8_t cmd)
 class tMBridge : public tSerialBase
 {
   public:
-    void Init(bool enable_flag, bool crsf_emulation_flag) {};
+    void Init(bool enable_flag, bool crsf_emulation_flag) {}
     void TelemetryStart(void) {}
     void TelemetryTick_ms(void) {}
     void Lock(void) {}
@@ -844,6 +887,6 @@ class tMBridge : public tSerialBase
 
 tMBridge mbridge;
 
-#endif // if (defined DEVICE_HAS_JRPIN5)
+#endif // ifdef DEVICE_HAS_JRPIN5
 
 #endif // MBRIDGE_INTERFACE_H

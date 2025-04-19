@@ -17,6 +17,7 @@
 #define DEVICE_HAS_BUZZER
 #define DEVICE_HAS_SERIAL2
 #define DEVICE_HAS_ESP_WIFI_BRIDGE_ON_SERIAL2
+#define DEVICE_HAS_ESP_WIFI_BRIDGE_CONFIGURE
 
 
 //-- Timers, Timing, EEPROM, and such stuff
@@ -47,7 +48,7 @@
 #define UARTC_USE_UART1_PA9PA10 // com USB/CLI
 #define UARTC_BAUD                TX_COM_BAUDRATE
 #define UARTC_USE_TX
-#define UARTC_TXBUFSIZE           TX_COM_TXBUFSIZE
+#define UARTC_TXBUFSIZE           TX_COM_TXBUFSIZE_LARGE // TX_COM_TXBUFSIZE
 #define UARTC_USE_TX_ISR
 #define UARTC_USE_RX
 #define UARTC_RXBUFSIZE           TX_COM_RXBUFSIZE
@@ -331,7 +332,6 @@ uint8_t fiveway_read(void)
 void esp_init(void)
 {
     gpio_init(ESP_GPIO0, IO_MODE_OUTPUT_PP_HIGH, IO_SPEED_DEFAULT); // low -> esp will start in bootloader mode
-//    gpio_init(ESP_RESET, IO_MODE_OUTPUT_PP_HIGH, IO_SPEED_DEFAULT); // low -> esp is in reset
     gpio_init(ESP_RESET, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_DEFAULT); // low -> esp is in reset
     gpio_init(ESP_DTR, IO_MODE_INPUT_PU, IO_SPEED_DEFAULT); // is normally high
     gpio_init(ESP_RTS, IO_MODE_INPUT_PU, IO_SPEED_DEFAULT); // is normally high

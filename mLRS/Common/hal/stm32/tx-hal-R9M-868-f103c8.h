@@ -22,6 +22,10 @@
 #define DEVICE_HAS_BUZZER
 #define DEVICE_HAS_FAN_ONOFF
 
+// Note on SERIAL_OR_COM:
+// The com uart is not initialized, the serial uart is, So, buffers are set as by the RX/TXBUFSIZE defines for serial.
+// The TXBUFSIZE setting for the com affects however the CLI's chunkenizer behavior.
+
 
 //-- Timers, Timing, EEPROM, and such stuff
 
@@ -42,7 +46,7 @@
 #define UARTB_USE_UART1_PA9PA10 // serial or COM (CLI) // goes via inverter to RX/TX of RS232 port
 #define UARTB_BAUD                TX_SERIAL_BAUDRATE
 #define UARTB_USE_TX
-#define UARTB_TXBUFSIZE           TX_COM_TXBUFSIZE // TX_SERIAL_TXBUFSIZE // choose the bigger one
+#define UARTB_TXBUFSIZE           TX_COM_TXBUFSIZE_SMALL // TX_SERIAL_TXBUFSIZE // choose the bigger one
 #define UARTB_USE_TX_ISR
 #define UARTB_USE_RX
 #define UARTB_RXBUFSIZE           TX_SERIAL_RXBUFSIZE

@@ -11,9 +11,9 @@
 #pragma once
 
 
-#define VERSION             10205 // leading zero makes it octal!
-#define VERSIONONLYSTR      "v1.2.05"
-#define SETUPLAYOUT         335 // this should be changed then Setup struct and/or serial changes
+#define VERSION             10307 // leading zero makes it octal!
+#define VERSIONONLYSTR      "v1.3.07"
+#define SETUPLAYOUT         10304 // this should be changed then Setup struct and/or serial changes
 
 
 //-------------------------------------------------------
@@ -63,7 +63,6 @@
 #define SETUP_TX_MAV_COMPONENT          1 // 0: off, 1: enabled
 
 #define SETUP_TX_BUZZER                 0 // 0: off, 1: LP, 2: rxLQ
-#define SETUP_TX_CLI_LINE_END           0 // 0: CR, 1: LF, 2: CRLF
 
 
 #define SETUP_RX_CHANNEL_ORDER          CHANNEL_ORDER_AETR
@@ -72,13 +71,15 @@
 
 #define SETUP_RX_FAILSAFE_MODE          0 // 0: no signal 1: low throttle, 4: CH1-CH4 center signal
 
+#define SETUP_RX_SERIAL_PORT            0 // 0: serial, 1: can
+
 #define SETUP_RX_SERIAL_BAUDRATE        3 // 0: 9600, 1: 19200, 2: 38400, 3: 57600, 4: 115200, 5: 230400
 
 #define SETUP_RX_POWER                  CPOWER
 
 #define SETUP_RX_DIVERSITY              DIVERSITY // 0: default, 1: ANTENNA 1 if diversity available, 2: ANTENNA 2 if diversity available
 
-#define SETUP_RX_SERIAL_LINK_MODE       2 // 0: transparent, 1: mavlink, 2: mavlinkX
+#define SETUP_RX_SERIAL_LINK_MODE       2 // 0: transparent, 1: mavlink, 2: mavlinkX, 3: mspX
 
 #define SETUP_RX_SEND_RADIO_STATUS      1 // 0: off, 1: ardu_1, 2: px4 aka "brad"
 #define SETUP_RX_SEND_RC_CHANNELS       0 // 0: off, 1: RC_CHANNEL_OVERRIDE, 2: RC_CHANNELS
@@ -146,7 +147,9 @@
 #define RX_SERIAL_RXBUFSIZE             2048 // ArduPilot also can be rude
 
 #define TX_COM_BAUDRATE                 115200
-#define TX_COM_TXBUFSIZE                1024 // cli needs it
+#define TX_COM_TXBUFSIZE                512 // 2048 // cli needs more than 1024   since 4.2.2025 we have cli chunks
+#define TX_COM_TXBUFSIZE_SMALL          256 // 512 // we don't have enough RAM
+#define TX_COM_TXBUFSIZE_LARGE          2048 // we have plenty and can easily afford
 #define TX_COM_RXBUFSIZE                512
 
 

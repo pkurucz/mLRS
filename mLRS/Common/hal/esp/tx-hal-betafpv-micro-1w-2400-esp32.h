@@ -9,65 +9,32 @@
 /*
   Info on DIP switches
    
-  1,2 on:   update firmware on main ESP32, USB is connected to UO 
-  3,4 on:   normal operation mode, USB is inoperational, UO connected to ESP8285
-  5,6,7 on: update firmware on ESP8285, USB is connected to ESP8285's uart
+  1,2 on:   update firmware on main ESP32, USB is connected to UARTO 
+  3,4 on:   normal operation mode, USB isn't used, UARTO connected to ESP8285
+  5,6,7 on: update firmware on ESP8285, USB is connected to ESP8285's UART
 
   Flashing ESP8285:
   - Board: Generic ESP8266 Module
+  - Upload Speed: can be 921600
   - Reset Method: dtr (aka modemcu)
 */
 
 //-------------------------------------------------------
 // ESP32, ELRS BETAFPV MICRO 1W 2400 TX
 //-------------------------------------------------------
-/*
-    Pin Defs
-    "serial_rx": 13
-    "serial_tx": 13
-    "radio_busy": 21
-    "radio_dio1": 4
-    "radio_miso": 19
-    "radio_mosi": 23
-    "radio_nss": 5
-    "radio_rst": 14
-    "radio_sck": 18
-    "power_rxen": 27
-    "power_txen": 26
-    "power_lna_gain": 12
-    "power_min": 1
-    "power_high": 6
-    "power_max": 6
-    "power_default": 2
-    "power_control": 0
-    "power_values": [-18,-15,-12,-7,-4,2]
-    "joystick": 25
-    "joystick_values": [2839,2191,1616,3511,0,4095]
-    "led_rgb": 16
-    "led_rgb_isgrb": true
-    "screen_sck": 32
-    "screen_sda": 22
-    "screen_type": 1
-    "screen_reversed": 1
-    "use_backpack": true
-    "debug_backpack_baud": 460800
-    "debug_backpack_rx": 3
-    "debug_backpack_tx": 1
-    "misc_fan_en": 17
-*/
-
+// https://github.com/ExpressLRS/targets/blob/master/TX/BETAFPV%202400%20Micro%201W.json
 
 #define DEVICE_HAS_JRPIN5
-//#define DEVICE_HAS_IN //for some reason sbus inv blocks the 5 way button
-//#define DEVICE_HAS_IN_INVERTED
-//#define DEVICE_HAS_SERIAL_OR_COM // board has UART which is shared between Serial or Com, selected by e.g. a switch
-#define DEVICE_HAS_NO_SERIAL
-#define DEVICE_HAS_NO_COM
-//#define DEVICE_HAS_NO_DEBUG
-
+#define DEVICE_HAS_SERIAL_OR_COM // hold 5-way in down direction at boot to enable CLI
+#define DEVICE_HAS_IN
+#define DEVICE_HAS_NO_DEBUG
+#define DEVICE_HAS_SINGLE_LED_RGB
 #define DEVICE_HAS_I2C_DISPLAY_ROT180
-#define DEVICE_HAS_FIVEWAY
 #define DEVICE_HAS_FAN_ONOFF
+
+// Note on SERIAL_OR_COM:
+// The com uart is not initialized, the serial uart is, So, buffers are set as by the RX/TXBUFSIZE defines for serial.
+// The TXBUFSIZE setting for the com affects however the CLI's chunkenizer behavior.
 
 
 //-- UARTS
@@ -78,33 +45,32 @@
 // UARTE = in port, SBus or whatever
 // UARTF = debug port
 
-#define UARTB_USE_SERIAL // serial, is on P1/P3
+#define UARTB_USE_SERIAL // serial
 #define UARTB_BAUD                TX_SERIAL_BAUDRATE
-#define UARTB_TXBUFSIZE           1024 // TX_SERIAL_TXBUFSIZE
+#define UARTB_USE_TX_IO           IO_P1
+#define UARTB_USE_RX_IO           IO_P3
+#define UARTB_TXBUFSIZE           TX_SERIAL_TXBUFSIZE
 #define UARTB_RXBUFSIZE           TX_SERIAL_RXBUFSIZE
 
-#define UARTC_USE_SERIAL // com USB/CLI, is on P1/P3
+#define UARTC_USE_SERIAL // COM (CLI)
 #define UARTC_BAUD                115200
-#define UARTC_TXBUFSIZE           0 // ?? // TX_COM_TXBUFSIZE
+#define UARTC_USE_TX_IO           IO_P1
+#define UARTC_USE_RX_IO           IO_P3
+#define UARTC_TXBUFSIZE           0  // TX FIFO = 128
 #define UARTC_RXBUFSIZE           TX_COM_RXBUFSIZE
 
-#define UART_USE_SERIAL1 // JR pin5, MBridge, is on P13
+#define UART_USE_SERIAL1 // JR bay pin5
 #define UART_BAUD                 400000
-#define UARTE_USE_TX_IO           -1 // no Tx pin needed
-#define UARTE_USE_RX_IO           13
-#define UART_TXBUFSIZE            512 //0 // 128 fifo should be sufficient // 512
-#define UART_RXBUFSIZE            512
+#define UART_USE_TX_IO            IO_P13
+#define UART_USE_RX_IO            IO_P13
+#define UART_TXBUFSIZE            0  // TX FIFO = 128
+#define UART_RXBUFSIZE            0  // RX FIFO = 128 + 1
 
-#define UARTE_USE_SERIAL1 // in port is on P13
-#define UARTE_BAUD                100000 // SBus normal baud rate, is being set later anyhow
-#define UARTE_USE_TX_IO           -1 // no Tx pin needed
-#define UARTE_USE_RX_IO           13
-#define UARTE_TXBUFSIZE           0 // not used
-#define UARTE_RXBUFSIZE           512
-
-#define UARTF_USE_SERIAL // debug
-#define UARTF_BAUD                115200
-#define UARTF_TXBUFSIZE           0 // ?? // 512
+#define UARTE_USE_SERIAL1 // in port, uses JRPin5
+#define UARTE_BAUD                 100000
+#define UARTE_USE_TX_IO            -1
+#define UARTE_USE_RX_IO            IO_P13
+#define UARTE_RXBUFSIZE            0 // RX FIFO = 128 + 1
 
 
 //-- SX1: SX12xx & SPI
@@ -162,21 +128,12 @@ void sx_dio_exti_isr_clearflag(void) {}
 
 
 //-- In port
-#if defined DEVICE_HAS_IN || defined DEVICE_HAS_IN_INVERTED
-#include "../../esp-lib/esp-uarte.h"
 
 void in_init_gpio(void) {}
 
-void in_set_normal(void)
-{
-    uart_set_line_inverse(UARTE_SERIAL_NO, UART_SIGNAL_INV_DISABLE);
-}
+void in_set_normal(void) { gpio_matrix_in((gpio_num_t)UARTE_USE_RX_IO, U1RXD_IN_IDX, false); }
 
-void in_set_inverted(void)
-{
-    uart_set_line_inverse(UARTE_SERIAL_NO, UART_SIGNAL_RXD_INV);
-}
-#endif
+void in_set_inverted(void) { gpio_matrix_in((gpio_num_t)UARTE_USE_RX_IO, U1RXD_IN_IDX, true); }
 
 
 //-- Button
@@ -275,10 +232,10 @@ IRAM_ATTR void led_blue_toggle(void)
 //-- 5 Way Switch
 
 #define FIVEWAY_ADC_IO            IO_P25
-#define KEY_UP_THRESH             2800 // tom: 2839 // ow: 2966 
-#define KEY_DOWN_THRESH           2200 // tom: 2191 // ow: 2282
-#define KEY_LEFT_THRESH           1650 // tom: 1616 // ow: 1685
-#define KEY_RIGHT_THRESH          3600 // tom: 3511 // ow: 3712
+#define KEY_RIGHT_THRESH          3511 // 3600 // tom = ELRS: 3511, ow: 3712
+#define KEY_UP_THRESH             2839 // 2800 // tom = ELRS: 2839, ow: 2966, marc: 2800 didn't work for him. 2839 did
+#define KEY_DOWN_THRESH           2191 // 2200 // tom = ELRS: 2191, ow: 2282
+#define KEY_LEFT_THRESH           1616 // 1650 // tom = ELRS: 1616, ow: 1685
 #define KEY_CENTER_THRESH         0
 
 #if defined DEVICE_HAS_I2C_DISPLAY || defined DEVICE_HAS_I2C_DISPLAY_ROT180 || defined DEVICE_HAS_FIVEWAY
@@ -293,11 +250,14 @@ IRAM_ATTR uint16_t fiveway_adc_read(void)
 IRAM_ATTR uint8_t fiveway_read(void)
 {
     int16_t adc = analogRead(FIVEWAY_ADC_IO);
-    if (adc > (KEY_CENTER_THRESH-250) && adc < (KEY_CENTER_THRESH+250)) return (1 << KEY_CENTER); // 0
-    if (adc > (KEY_LEFT_THRESH-250) && adc < (KEY_LEFT_THRESH+250)) return (1 << KEY_LEFT); 
-    if (adc > (KEY_DOWN_THRESH-250) && adc < (KEY_DOWN_THRESH+250)) return (1 << KEY_DOWN);
-    if (adc > (KEY_UP_THRESH-250) && adc < (KEY_UP_THRESH+250)) return (1 << KEY_UP);
-    if (adc > (KEY_RIGHT_THRESH-250) && adc < (KEY_RIGHT_THRESH+250)) return (1 << KEY_RIGHT);
+    // BetaFPV 1W Micro seems to have pretty widely varying resistor values, 
+    // so we do a less strict method here
+    // Attention: this needs to be ordered!
+    if (adc < (( 0 + KEY_LEFT_THRESH) / 2)) return (1 << KEY_CENTER);
+    if (adc < ((KEY_LEFT_THRESH + KEY_DOWN_THRESH) / 2)) return (1 << KEY_LEFT); 
+    if (adc < ((KEY_DOWN_THRESH + KEY_UP_THRESH) / 2)) return (1 << KEY_DOWN);
+    if (adc < ((KEY_UP_THRESH + KEY_RIGHT_THRESH) / 2)) return (1 << KEY_UP);
+    if (adc < ((KEY_RIGHT_THRESH + 4095) / 2)) return (1 << KEY_RIGHT);
     return 0;
 }
 #endif
@@ -315,7 +275,7 @@ void ser_or_com_init(void)
     uint8_t cnt = 0;
     for (uint8_t i = 0; i < 16; i++) {
         uint16_t adc = analogRead(FIVEWAY_ADC_IO);
-        if (adc > (KEY_DOWN_THRESH-200) && adc < (KEY_DOWN_THRESH+200)) cnt++;
+        if (adc > (KEY_DOWN_THRESH-250) && adc < (KEY_DOWN_THRESH+250)) cnt++;
     }
     tx_ser_or_com_serial = !(cnt > 8);
 }

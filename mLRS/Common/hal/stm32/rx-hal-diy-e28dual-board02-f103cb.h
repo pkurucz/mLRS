@@ -43,7 +43,7 @@
 //-- UARTS
 // UARTB = serial port
 // UART = output port, SBus or whatever
-// UARTC = debug port
+// UARTF = debug port
 
 #define UARTB_USE_UART3_PB10PB11 // serial
 #define UARTB_BAUD                RX_SERIAL_BAUDRATE
@@ -61,13 +61,13 @@
 //#define UART_USE_RX
 //#define UART_RXBUFSIZE            512
 
-#define UARTC_USE_UART1_PA9PA10 // debug
-#define UARTC_BAUD                115200
-#define UARTC_USE_TX
-#define UARTC_TXBUFSIZE           512
-#define UARTC_USE_TX_ISR
-//#define UARTC_USE_RX
-//#define UARTC_RXBUFSIZE           512
+#define UARTF_USE_UART1_PA9PA10 // debug
+#define UARTF_BAUD                115200
+#define UARTF_USE_TX
+#define UARTF_TXBUFSIZE           512
+#define UARTF_USE_TX_ISR
+//#define UARTF_USE_RX
+//#define UARTF_RXBUFSIZE           512
 
 
 //-- SX1: SX12xx & SPI
@@ -89,6 +89,8 @@
 #define SX_DIO_EXTI_IRQn              EXTI3_IRQn
 #define SX_DIO_EXTI_IRQHandler        EXTI3_IRQHandler
 //#define SX_DIO_EXTI_IRQ_PRIORITY    11
+
+#define SX_USE_REGULATOR_MODE_DCDC
 
 void sx_init_gpio(void)
 {
@@ -161,6 +163,8 @@ void sx_dio_exti_isr_clearflag(void)
 #define SX2_DIO_EXTI_IRQn             EXTI1_IRQn
 #define SX2_DIO_EXTI_IRQHandler       EXTI1_IRQHandler
 //#define SX2_DIO_EXTI_IRQ_PRIORITY   11
+
+#define SX2_USE_REGULATOR_MODE_DCDC
 
 void sx2_init_gpio(void)
 {

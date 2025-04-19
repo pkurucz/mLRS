@@ -55,12 +55,12 @@ void tChannelOrder::Set(uint8_t new_channel_order)
             }
             break;
         default:
-            while (1) {} // must not happen
+            while(1){} // must not happen
     }
 }
 
 
-void tChannelOrder::Apply(tRcData* rc)
+void tChannelOrder::Apply(tRcData* const rc)
 {
     uint16_t ch[4] = { // take a copy to swap
         rc->ch[0],
@@ -78,6 +78,13 @@ void tChannelOrder::Apply(tRcData* rc)
 uint8_t tChannelOrder::ChannelMap(uint8_t n)
 {
     return channel_map[n];
+}
+
+
+void tChannelOrder::SetAndApply(tRcData* const rc, uint8_t new_channel_order)
+{
+    Set(new_channel_order);
+    Apply(rc);
 }
 
 

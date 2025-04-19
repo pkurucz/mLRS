@@ -64,7 +64,7 @@
 #define UARTC_USE_UART1_PA9PA10 // COM (CLI)
 #define UARTC_BAUD                115200
 #define UARTC_USE_TX
-#define UARTC_TXBUFSIZE           TX_COM_TXBUFSIZE
+#define UARTC_TXBUFSIZE           TX_COM_TXBUFSIZE_SMALL
 #define UARTC_USE_TX_ISR
 #define UARTC_USE_RX
 #define UARTC_RXBUFSIZE           TX_COM_RXBUFSIZE
@@ -122,6 +122,8 @@
 #define SX_DIO_EXTI_IRQn              EXTI3_IRQn
 #define SX_DIO_EXTI_IRQHandler        EXTI3_IRQHandler
 //#define SX_DIO_EXTI_IRQ_PRIORITY    11
+
+#define SX_USE_REGULATOR_MODE_DCDC
 
 void sx_init_gpio(void)
 {
@@ -194,6 +196,8 @@ void sx_dio_exti_isr_clearflag(void)
 #define SX2_DIO_EXTI_IRQn             EXTI1_IRQn
 #define SX2_DIO_EXTI_IRQHandler       EXTI1_IRQHandler
 //#define SX2_DIO_EXTI_IRQ_PRIORITY   11
+
+#define SX2_USE_REGULATOR_MODE_DCDC
 
 void sx2_init_gpio(void)
 {

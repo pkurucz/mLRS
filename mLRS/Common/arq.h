@@ -205,6 +205,7 @@ void tTransmitArq::SetRetryCntAuto(int32_t _frame_cnt, uint8_t mode)
     case MODE_50HZ:
     case MODE_31HZ:
     case MODE_19HZ:
+    case MODE_19HZ_7X:
         SetRetryCnt((_frame_cnt >= 800) ? 2 : 1);
     }
 
@@ -322,7 +323,7 @@ void tReceiveArq::spin(void)
         break;
 
     default: // ARQ_RX_IDLE
-        while(1) {} // must not happen, should have been called after FrameMissed(), Received()
+        while(1){} // must not happen, should have been called after FrameMissed(), Received()
     }
 }
 

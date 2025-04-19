@@ -23,7 +23,7 @@ tOutBase::tOutBase(void)
 }
 
 
-void tOutBase::Init(tRxSetup* _setup)
+void tOutBase::Init(tRxSetup* const _setup)
 {
     config = UINT8_MAX;
     initialized = false;
@@ -95,7 +95,7 @@ void tOutBase::SetChannelOrder(uint8_t new_channel_order)
 }
 
 
-void tOutBase::SendRcData(tRcData* rc_orig, bool frame_missed, bool failsafe, int8_t rssi, uint8_t lq)
+void tOutBase::SendRcData(tRcData* const rc_orig, bool frame_missed, bool failsafe, int8_t rssi, uint8_t lq)
 {
     memcpy(&rc, rc_orig, sizeof(tRcData)); // copy rc data, to not modify it !!
     channel_order.Apply(&rc);
@@ -146,12 +146,12 @@ void tOutBase::SendRcData(tRcData* rc_orig, bool frame_missed, bool failsafe, in
     }
 
     if (setup->OutRssiChannelMode >= OUT_RSSI_LQ_CHANNEL_CH5 && setup->OutRssiChannelMode <= OUT_RSSI_LQ_CHANNEL_CH16) {
-        uint8_t rssi_channel = setup->OutRssiChannelMode + 4;
+        uint8_t rssi_channel = setup->OutRssiChannelMode + 4; // 5 .. 16
         rc.ch[rssi_channel - 1] = rssi_i8_to_rc(rssi);
     }
 
     if (setup->OutLqChannelMode >= OUT_RSSI_LQ_CHANNEL_CH5 && setup->OutLqChannelMode <= OUT_RSSI_LQ_CHANNEL_CH16) {
-        uint8_t lq_channel = setup->OutLqChannelMode + 4;
+        uint8_t lq_channel = setup->OutLqChannelMode + 4; // 5 .. 16
         rc.ch[lq_channel - 1] = lq_to_rc(lq);
     }
 
@@ -169,7 +169,7 @@ void tOutBase::SendRcData(tRcData* rc_orig, bool frame_missed, bool failsafe, in
 }
 
 
-void tOutBase::SendLinkStatistics(tOutLinkStats* lstats)
+void tOutBase::SendLinkStatistics(tOutLinkStats* const lstats)
 {
     switch (config) {
     case OUT_CONFIG_SBUS:
@@ -216,7 +216,7 @@ void tOutBase::SendLinkStatisticsDisconnected(void)
 // SBus
 //-------------------------------------------------------
 
-void tOutBase::send_sbus_rcdata(tRcData* rc, bool frame_lost, bool failsafe)
+void tOutBase::send_sbus_rcdata(tRcData* const rc, bool frame_lost, bool failsafe)
 {
 tSBusFrame sbus_buf;
 
@@ -257,9 +257,9 @@ tSBusFrame sbus_buf;
 // Crsf
 //-------------------------------------------------------
 
-void tOutBase::send_crsf_rcdata(tRcData* rc)
+void tOutBase::send_crsf_rcdata(tRcData* const rc)
 {
-tCrsfChannelFrame crsf_buf;
+tCrsfRcChannelFrame crsf_buf;
 
     // chX = (((int32_t)(rc->ch[X]) - 1024) * 1920) / 2047 + 1000;
     crsf_buf.ch.ch0 = rc_to_crsf(rc->ch[0]);
@@ -280,16 +280,16 @@ tCrsfChannelFrame crsf_buf;
     crsf_buf.ch.ch15 = rc_to_crsf(rc->ch[15]);
 
     crsf_buf.address = CRSF_ADDRESS_FLIGHT_CONTROLLER; // was CRSF_ADDRESS_BROADCAST, but ArduPilot changed in 4.5, @d5ba0b6
-    crsf_buf.len = CRSF_CHANNELPACKET_LEN + 2;
-    crsf_buf.frame_id = CRSF_FRAME_ID_CHANNELS;
+    crsf_buf.len = CRSF_RCCHANNELPACKET_LEN + 2;
+    crsf_buf.frame_id = CRSF_FRAME_ID_RC_CHANNELS;
 
-    crsf_buf.crc = crsf_crc8_update(0, &(crsf_buf.frame_id), CRSF_CHANNELPACKET_LEN + 1);
+    crsf_buf.crc = crsf_crc8_update(CRSF_CRC8_INIT, &(crsf_buf.frame_id), CRSF_RCCHANNELPACKET_LEN + 1);
 
-    putbuf((uint8_t*)&crsf_buf, CRSF_CHANNELPACKET_LEN + 4);
+    putbuf((uint8_t*)&crsf_buf, CRSF_RCCHANNELPACKET_LEN + 4);
 }
 
 
-void tOutBase::send_crsf_linkstatistics(tOutLinkStats* lstats)
+void tOutBase::send_crsf_linkstatistics(tOutLinkStats* const lstats)
 {
 tCrsfLinkStatisticsFrame crsf_buf;
 
@@ -307,7 +307,7 @@ tCrsfLinkStatisticsFrame crsf_buf;
     crsf_buf.ls.uplink_snr = lstats->receiver_snr;
     crsf_buf.ls.active_antenna = lstats->receiver_antenna;
     crsf_buf.ls.mode = crsf_cvt_mode(lstats->mode);
-    crsf_buf.ls.uplink_transmit_power = crsf_cvt_power(lstats->receiver_power_dbm);
+    crsf_buf.ls.uplink_transmit_power = crsf_cvt_power(lstats->receiver_power_dbm); // actually wrong, should be Tx tx power, but hey ...
     crsf_buf.ls.downlink_rssi = crsf_cvt_rssi_rx(lstats->transmitter_rssi);
     crsf_buf.ls.downlink_LQ = lstats->transmitter_LQ;
     crsf_buf.ls.downlink_snr = lstats->transmitter_snr;
@@ -316,7 +316,7 @@ tCrsfLinkStatisticsFrame crsf_buf;
     crsf_buf.len = CRSF_LINK_STATISTICS_LEN + 2;
     crsf_buf.frame_id = CRSF_FRAME_ID_LINK_STATISTICS;
 
-    crsf_buf.crc = crsf_crc8_update(0, &(crsf_buf.frame_id), CRSF_LINK_STATISTICS_LEN + 1);
+    crsf_buf.crc = crsf_crc8_update(CRSF_CRC8_INIT, &(crsf_buf.frame_id), CRSF_LINK_STATISTICS_LEN + 1);
 
     putbuf((uint8_t*)&crsf_buf, CRSF_LINK_STATISTICS_LEN + 4);
 }
