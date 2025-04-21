@@ -10,9 +10,9 @@
 // ESP32, ELRS GENERIC 2400 True Diversity PA RX
 //-------------------------------------------------------
 
-#define DEVICE_HAS_SINGLE_LED_RGB
-#define DEVICE_HAS_DIVERSITY_SINGLE_SPI // must be set, doesn't work without it
-#define DEVICE_HAS_NO_DEBUG
+//#define DEVICE_HAS_SINGLE_LED
+//#define DEVICE_HAS_DIVERSITY_SINGLE_SPI // must be set, doesn't work without it
+//#define DEVICE_HAS_NO_DEBUG
 //#define DEVICE_HAS_SERIAL_OR_DEBUG
 
 
@@ -21,27 +21,31 @@
 // UART = output port, SBus or whatever
 // UARTC = debug port
 
-#define UARTB_USE_SERIAL
+#define UART_USE_SERIAL1
+
+#define UARTB_USE_SERIAL2
 #define UARTB_BAUD                RX_SERIAL_BAUDRATE
 #define UARTB_TXBUFSIZE           RX_SERIAL_TXBUFSIZE
 #define UARTB_RXBUFSIZE           RX_SERIAL_RXBUFSIZE
 
+#define DEVICE_HAS_DEBUG_ON_USB
+#if 0
 #define UARTC_USE_SERIAL
 #define UARTC_BAUD                115200
-
+#endif
 
 //-- SX1: SX12xx & SPI
 
-#define SPI_CS_IO                 IO_P27
-#define SPI_MISO                  IO_P33
-#define SPI_MOSI                  IO_P32
-#define SPI_SCK                   IO_P25
-#define SPI_FREQUENCY             18000000L
-#define SX_BUSY                   IO_P36
-#define SX_DIO1                   IO_P37
-#define SX_RESET                  IO_P26
-#define SX_RX_EN                  IO_P10
-#define SX_TX_EN                  IO_P14
+#define SPI_CS_IO                 IO_P36
+#define SPI_MISO                  IO_P39
+#define SPI_MOSI                  IO_P38
+#define SPI_SCK                   IO_P37
+#define SPI_FREQUENCY             1800000L
+#define SX_BUSY                   IO_P42
+#define SX_DIO1                   IO_P41
+#define SX_RESET                  IO_P35
+#define SX_RX_EN                  IO_P46
+#define SX_TX_EN                  IO_P45
 
 IRQHANDLER(void SX_DIO_EXTI_IRQHandler(void);)
 
@@ -86,12 +90,12 @@ IRAM_ATTR void sx_dio_exti_isr_clearflag(void) {}
 
 //-- SX2: SX12xx & SPI
 
-#define SX2_CS_IO                 IO_P13
-#define SX2_BUSY                  IO_P39
-#define SX2_DIO1                  IO_P34
-#define SX2_RESET                 IO_P21
-#define SX2_RX_EN                 IO_P9
-#define SX2_TX_EN                 IO_P15
+#define SX2_CS_IO                 IO_P47
+#define SX2_BUSY                  IO_P34
+#define SX2_DIO1                  IO_P33
+#define SX2_RESET                 SX_RESET
+#define SX2_RX_EN                 IO_P8
+#define SX2_TX_EN                 IO_P7
 
 IRQHANDLER(void SX2_DIO_EXTI_IRQHandler(void);)
 
@@ -102,7 +106,9 @@ void sx2_init_gpio(void)
     gpio_init(SX2_BUSY, IO_MODE_INPUT_PU);
     gpio_init(SX2_TX_EN, IO_MODE_OUTPUT_PP_LOW);
     gpio_init(SX2_RX_EN, IO_MODE_OUTPUT_PP_LOW);
+#if (SX2_RESET != SX_RESET)
     gpio_init(SX2_RESET, IO_MODE_OUTPUT_PP_LOW);
+#endif
 }
 
 IRAM_ATTR void spib_select(void)
@@ -147,103 +153,73 @@ void sx2_dio_exti_isr_clearflag(void) {}
 
 //-- Button
 
-#define BUTTON                    IO_P0
+#define ENTER_BUTTON                    IO_P0
+#define UP_BUTTON                       IO_P15
+#define DOWN_BUTTON                     IO_P16
 
 void button_init(void)
 {
-    gpio_init(BUTTON, IO_MODE_INPUT_PU);
+    gpio_init(ENTER_BUTTON, IO_MODE_INPUT_PU);
+    gpio_init(UP_BUTTON, IO_MODE_INPUT_PU);
+    gpio_init(DOWN_BUTTON, IO_MODE_INPUT_PU);
 }
 
 IRAM_ATTR bool button_pressed(void)
 {
-    return gpio_read_activelow(BUTTON) ? true : false;
+    return gpio_read_activelow(ENTER_BUTTON) ? true : false;
 }
 
 
 //-- LEDs
-#include <NeoPixelBus.h>
-#define LED_RED                    IO_P22
-bool ledRedState;
-bool ledGreenState;
-bool ledBlueState;
-
-NeoPixelBus<NeoGrbFeature, NeoEsp32I2s0Ws2812xMethod> ledRGB(1, LED_RED);
+#define LED_WHITE                   IO_P21
+#define LED_RED                     IO_P18
+#define LED_GREEN                   IO_P17
 
 void leds_init(void)
 {
-    ledRGB.Begin();
-    ledRGB.Show();
+    gpio_init(LED_WHITE, IO_MODE_OUTPUT_PP_HIGH);
+    gpio_init(LED_RED, IO_MODE_OUTPUT_PP_HIGH);
+    gpio_init(LED_GREEN, IO_MODE_OUTPUT_PP_HIGH);
 }
 
-IRAM_ATTR void led_red_off(void)
+IRAM_ATTR void led_white_off(void) { gpio_high(LED_WHITE); }
+IRAM_ATTR void led_white_on(void) { gpio_low(LED_WHITE); }
+IRAM_ATTR void led_white_toggle(void) { gpio_toggle(LED_WHITE); }
+IRAM_ATTR void led_red_off(void) { gpio_high(LED_RED); }
+IRAM_ATTR void led_red_on(void) { gpio_low(LED_RED); }
+IRAM_ATTR void led_red_toggle(void) { gpio_toggle(LED_RED); }
+IRAM_ATTR void led_green_off(void) { gpio_high(LED_GREEN); }
+IRAM_ATTR void led_green_on(void) { gpio_low(LED_GREEN); }
+IRAM_ATTR void led_green_toggle(void) { gpio_toggle(LED_GREEN); }
+
+//-- Serial or Com Switch
+// use com if FIVEWAY is DOWN during power up, else use serial
+
+#ifdef DEVICE_HAS_SERIAL_OR_COM
+bool tx_ser_or_com_serial = true; // we use serial as default
+
+void ser_or_com_init(void)
 {
-    if (!ledRedState) return;
-    ledRGB.SetPixelColor(0, RgbColor(0, 0, 0));
-    ledRGB.Show();
-    ledRedState = 0;
+    gpio_read_activelow(UP_BUTTON) ? true : false;
 }
 
-IRAM_ATTR void led_red_on(void)
+IRAM_ATTR bool ser_or_com_serial(void)
 {
-    if (ledRedState) return;
-    ledRGB.SetPixelColor(0, RgbColor(255, 0, 0));
-    ledRGB.Show();
-    ledRedState = 1;
+    return tx_ser_or_com_serial;
 }
 
-IRAM_ATTR void led_red_toggle(void)
+IRAM_ATTR void ser_or_com_set_to_com(void)
 {
-    if (ledRedState) { led_red_off(); } else { led_red_on(); }
+    tx_ser_or_com_serial = false;
 }
-
-IRAM_ATTR void led_green_off(void)
-{
-    if (!ledGreenState) return;
-    ledRGB.SetPixelColor(0, RgbColor(0, 0, 0));
-    ledRGB.Show();
-    ledGreenState = 0;
-}
-
-IRAM_ATTR void led_green_on(void)
-{
-    if (ledGreenState) return;
-    ledRGB.SetPixelColor(0, RgbColor(0, 255, 0));
-    ledRGB.Show();
-    ledGreenState = 1;
-}
-
-IRAM_ATTR void led_green_toggle(void)
-{
-    if (ledGreenState) { led_green_off(); } else { led_green_on(); }
-}
-
-IRAM_ATTR void led_blue_off(void)
-{
-    if (!ledBlueState) return;
-    ledRGB.SetPixelColor(0, RgbColor(0, 0, 0));
-    ledRGB.Show();
-    ledBlueState = 0;
-}
-
-IRAM_ATTR void led_blue_on(void)
-{
-    if (ledBlueState) return;
-    ledRGB.SetPixelColor(0, RgbColor(0, 0, 255));
-    ledRGB.Show();
-    ledBlueState = 1;
-}
-
-IRAM_ATTR void led_blue_toggle(void)
-{
-    if (ledBlueState) { led_blue_off(); } else { led_blue_on(); }
-}
+#endif
 
 
 //-- POWER
 #ifndef POWER_OVERLAY
 
-#define POWER_GAIN_DBM            18 // gain of a PA stage if present
-#define POWER_SX1280_MAX_DBM      SX1280_POWER_3_DBM  // maximum allowed sx power
+#define POWER_GAIN_DBM            25 // gain of a PA stage if present
+#define POWER_SX1280_MAX_DBM      SX1280_POWER_0_DBM  // maximum allowed sx power
 #define POWER_USE_DEFAULT_RFPOWER_CALC
 
 #define RFPOWER_DEFAULT           1 // index into rfpower_list array
