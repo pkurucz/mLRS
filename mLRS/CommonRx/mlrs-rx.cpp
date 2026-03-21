@@ -10,8 +10,8 @@
 
 #define DBG_MAIN(x)
 #define DBG_MAIN_SLIM(x)
-//#define DEBUG_ENABLED
-//#define FAIL_ENABLED
+#define DEBUG_ENABLED
+#define FAIL_ENABLED
 
 
 // we set the priorities here to have an overview, SysTick is at 15
@@ -41,7 +41,10 @@
 #ifdef USE_SERIAL
 #include "../Common/esp-lib/esp-uartb.h"
 #endif
-#ifdef USE_DEBUG
+#ifdef USE_USB
+#include "../Common/esp-lib/esp-usb-vcp.h"
+#endif
+#if defined USE_DEBUG && !defined DEVICE_HAS_DEBUG_ON_USB
 #ifdef DEVICE_HAS_DEBUG_SWUART
 #include "../Common/esp-lib/esp-uart-sw.h"
 #else
@@ -609,8 +612,11 @@ INITCONTROLLER_END
         dronecan.Tick_ms();
 
         if (!tick_1hz) {
+            led_white_toggle();
+#if 1
             dbg.puts(".");
-/*            dbg.puts("\nRX: ");
+#else
+            dbg.puts("\nRX: ");
             dbg.puts(u8toBCD_s(stats.GetLQ_rc())); dbg.putc(',');
             dbg.puts(u8toBCD_s(stats.GetLQ_serial()));
             dbg.puts(" (");
@@ -625,7 +631,8 @@ INITCONTROLLER_END
             dbg.puts(s8toBCD_s(stats.last_snr1)); dbg.puts("; ");
 
             dbg.puts(u16toBCD_s(stats.bytes_transmitted.GetBytesPerSec())); dbg.puts(", ");
-            dbg.puts(u16toBCD_s(stats.bytes_received.GetBytesPerSec())); dbg.puts("; "); */
+            dbg.puts(u16toBCD_s(stats.bytes_received.GetBytesPerSec())); dbg.puts("; ");
+#endif
         }
     }
 

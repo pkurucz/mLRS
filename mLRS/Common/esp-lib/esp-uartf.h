@@ -134,7 +134,7 @@ IRAM_ATTR uint16_t uartf_rx_available(void)
 void _uartf_initit(uint32_t baud, UARTPARITYENUM parity, UARTSTOPBITENUM stopbits)
 {
 #ifdef ESP32
-    UARTF_SERIAL_NO.setTxBufferSize(UARTF_TXBUFSIZE);
+//    UARTF_SERIAL_NO.setTxBufferSize(UARTF_TXBUFSIZE);
     UARTF_SERIAL_NO.setRxBufferSize(UARTF_RXBUFSIZE);
 
     uint32_t config = SERIAL_8N1;
@@ -161,11 +161,11 @@ void _uartf_initit(uint32_t baud, UARTPARITYENUM parity, UARTSTOPBITENUM stopbit
 #if defined UARTF_USE_TX_IO || defined UARTF_USE_RX_IO // both need to be defined
     UARTF_SERIAL_NO.begin(baud, config, UARTF_USE_RX_IO, UARTF_USE_TX_IO);
 #else
-    UARTF_SERIAL_NO.begin(baud, config);
+//    UARTF_SERIAL_NO.begin(baud, config);
 #endif
 
-    UARTF_SERIAL_NO.setRxFIFOFull(8);  // > 57600 baud sets to 120 which is too much, buffer only 128 bytes
-    UARTF_SERIAL_NO.setRxTimeout(1);   // wait for 1 symbol (~11 bits) to trigger Rx ISR, default 2
+//    UARTF_SERIAL_NO.setRxFIFOFull(8);  // > 57600 baud sets to 120 which is too much, buffer only 128 bytes
+//    UARTF_SERIAL_NO.setRxTimeout(1);   // wait for 1 symbol (~11 bits) to trigger Rx ISR, default 2
 
 #elif defined ESP8266
     UARTF_SERIAL_NO.setRxBufferSize(UARTF_RXBUFSIZE);

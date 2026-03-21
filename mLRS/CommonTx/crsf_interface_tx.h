@@ -169,6 +169,8 @@ void crsf_pin5_cc1_callback(void) { crsf.pin5_cc1_callback(); }
 // is called in isr context
 bool tTxCrsf::transmit_start(void)
 {
+return false;
+/*
     tx_free = true; // tell external code that tx_frame can be filled with new data
 
     if (!tx_available) { // nothing to send
@@ -180,6 +182,7 @@ bool tTxCrsf::transmit_start(void)
     tx_available = 0;
 
     return true;
+*/    
 }
 
 

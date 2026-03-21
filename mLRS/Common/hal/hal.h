@@ -82,6 +82,7 @@ In rx-hal files:
 #define DEVICE_HAS_SERIAL_OR_DEBUG  // is selected by DEBUG_ENABLED define
 #define DEVICE_HAS_NO_DEBUG         // board has no Debug port
 #define DEVICE_HAS_DEBUG_SWUART     // implement Debug as software UART
+#define DEVICE_HAS_DEBUG_ON_USB     // implement Debug as software UART
 #define DEVICE_HAS_I2C_DAC          // board has a DAC for power control on I2C
 #define DEVICE_HAS_SYSTEMBOOT       // board has a means to invoke the system bootloader on startup
 #define DEVICE_HAS_SINGLE_LED       // board has only one LED
@@ -292,6 +293,9 @@ Note: Some "high-level" features are set for each device in the device_conf.h fi
   #endif
   #if defined DEBUG_ENABLED && !defined DEVICE_HAS_NO_DEBUG
     #define USE_DEBUG
+    #ifdef DEVICE_HAS_DEBUG_ON_USB
+      #define USE_USB
+    #endif
   #endif
 #endif
 #endif // DEVICE_IS_RECEIVER
@@ -305,6 +309,9 @@ Note: Some "high-level" features are set for each device in the device_conf.h fi
   #endif
   #if defined DEBUG_ENABLED && !defined DEVICE_HAS_NO_DEBUG
     #define USE_DEBUG
+    #ifdef DEVICE_HAS_DEBUG_ON_USB
+      #define USE_USB
+    #endif
   #endif
 #else
   #if !defined DEVICE_HAS_NO_SERIAL

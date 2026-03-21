@@ -105,7 +105,7 @@ class Sx126xDriverCommon : public Sx126xDriverBase
     void Init(void)
     {
         gconfig = nullptr;
-        osc_configuration = SX12xx_OSCILLATOR_CONFIG_TCXO_1P8_V;
+        osc_configuration = SX12xx_OSCILLATOR_CONFIG_TCXO_3P3_V;
         lora_configuration = nullptr;
         gfsk_configuration = nullptr;
     }
