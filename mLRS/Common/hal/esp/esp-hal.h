@@ -157,3 +157,7 @@
 #include "tx-hal-pkurucz-td-pa-2400-esp32s3.h"
 #endif
 
+#ifdef RX_PKURUCZ_900_ESP32S2
+#include "rx-hal-pkurucz-900-esp32s2.h"
+#endif
+

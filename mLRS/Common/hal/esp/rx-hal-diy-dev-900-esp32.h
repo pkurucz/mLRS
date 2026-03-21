@@ -31,23 +31,23 @@
 
 //-- SX1: SX12xx & SPI
 
-#define SPI_CS_IO                 IO_P18
+#define SPI_CS_IO                 IO_P36
 #define SPI_FREQUENCY             10000000L
-#define SPI_MISO                  IO_P19
-#define SPI_MOSI                  IO_P27
-#define SPI_SCK                   IO_P5
-#define SX_RESET                  IO_P14
-#define SX_DIO0                   IO_P26
+#define SPI_MISO                  IO_P39
+#define SPI_MOSI                  IO_P38
+#define SPI_SCK                   IO_P37
+#define SX_RESET                  IO_P45
+#define SX_DIO1                   IO_P2
 
 IRQHANDLER(void SX_DIO_EXTI_IRQHandler(void);)
 
 void sx_init_gpio(void)
 {
-    gpio_init(SX_DIO0, IO_MODE_INPUT_ANALOG);
+    gpio_init(SX_DIO1, IO_MODE_INPUT_ANALOG);
     gpio_init(SX_RESET, IO_MODE_OUTPUT_PP_HIGH);
 
     // Fake ground for serial
-    gpio_init(13, IO_MODE_OUTPUT_PP_LOW);
+    //gpio_init(13, IO_MODE_OUTPUT_PP_LOW);
 }
 
 IRAM_ATTR void sx_amp_transmit(void) {}
@@ -56,7 +56,7 @@ void sx_dio_init_exti_isroff(void) {}
 
 void sx_dio_enable_exti_isr(void)
 {
-    attachInterrupt(SX_DIO0, SX_DIO_EXTI_IRQHandler, RISING);
+    attachInterrupt(SX_DIO1, SX_DIO_EXTI_IRQHandler, RISING);
 }
 
 IRAM_ATTR void sx_dio_exti_isr_clearflag(void) {}
@@ -79,22 +79,22 @@ IRAM_ATTR bool button_pressed(void)
 
 //-- LEDs
 
-#define LED_RED                   IO_P25
+#define LED_RED                   IO_P16
 
 void leds_init(void)
 {
-    gpio_init(LED_RED, IO_MODE_OUTPUT_PP_LOW);
+    gpio_init(LED_RED, IO_MODE_OUTPUT_PP_HIGH);
 }
 
-IRAM_ATTR void led_red_off(void) { gpio_low(LED_RED); }
-IRAM_ATTR void led_red_on(void) { gpio_high(LED_RED); }
+IRAM_ATTR void led_red_off(void) { gpio_high(LED_RED); }
+IRAM_ATTR void led_red_on(void) { gpio_low(LED_RED); }
 IRAM_ATTR void led_red_toggle(void) { gpio_toggle(LED_RED); }
 
 
 //-- POWER
 
 #define POWER_GAIN_DBM            0 // gain of a PA stage if present
-#define POWER_SX1276_MAX_DBM      SX1276_OUTPUT_POWER_MAX // maximum allowed sx power
+#define POWER_SX126X_MAX_DBM      SX126X_POWER_17_DBM // maximum allowed sx power
 #define POWER_USE_DEFAULT_RFPOWER_CALC
 
 #define RFPOWER_DEFAULT           1 // index into rfpower_list array
