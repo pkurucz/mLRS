@@ -282,3 +282,12 @@
   #define DEVICE_HAS_SX128x
   #define FREQUENCY_BAND_2P4_GHZ
 #endif
+
+
+
+#ifdef RX_PKURUCZ_TD_PA_2400_ESP32S3
+  #define DEVICE_NAME "PKURUCZ TD PA 2.4G"
+  #define DEVICE_IS_RECEIVER
+  #define DEVICE_HAS_SX128x
+  #define FREQUENCY_BAND_2P4_GHZ
+#endif
