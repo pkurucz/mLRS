@@ -49,7 +49,10 @@
 #ifdef USE_SERIAL2
 #include "../Common/esp-lib/esp-uartd.h"
 #endif
-#ifdef USE_DEBUG
+#ifdef USE_USB
+#include "../Common/esp-lib/esp-usb-vcp.h"
+#endif
+#if defined USE_DEBUG && !defined DEVICE_HAS_DEBUG_ON_USB
 #ifdef DEVICE_HAS_DEBUG_SWUART
 #include "../Common/esp-lib/esp-uart-sw.h"
 #else

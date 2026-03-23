@@ -120,12 +120,17 @@ class tDebugPort : public tSerialBase
 {
 #ifdef USE_DEBUG
   public:
+#ifdef DEVICE_HAS_DEBUG_ON_USB // USE_USB
+    void Init(void) { usb_init(); }
+    void putbuf(uint8_t* buf, uint16_t len) override { usb_putbuf(buf, len); }
+#else
 #ifdef DEVICE_HAS_DEBUG_SWUART
     void Init(void) { swuart_init(); }
     void putbuf(uint8_t* const buf, uint16_t len) override { swuart_putbuf(buf, len); }
 #else
     void Init(void) { uartf_init(); }
     void putbuf(uint8_t* const buf, uint16_t len) override { uartf_putbuf(buf, len); }
+#endif
 #endif
 #endif
 };
