@@ -39,7 +39,16 @@ class tLEDs
         is_in_bind = false;
 
         led_red_off();
+        led_green_off();
+        led_white_off();
+  
         for (uint8_t i = 0; i < 7; i++) { led_red_toggle(); delay_ms(50); }
+        for (uint8_t i = 0; i < 7; i++) { led_green_toggle(); delay_ms(50); }
+        for (uint8_t i = 0; i < 7; i++) { led_white_toggle(); delay_ms(50); }
+        led_red_off();
+        led_green_off();
+        led_white_off();
+        
     }
 
     void Tick_ms(bool connected)
