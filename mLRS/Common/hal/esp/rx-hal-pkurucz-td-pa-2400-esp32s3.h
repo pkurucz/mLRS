@@ -86,14 +86,15 @@ IRQHANDLER(void SX_DIO_EXTI_IRQHandler(void);)
 void sx_init_gpio(void)
 {
     gpio_init(SX_DIO1, IO_MODE_INPUT_ANALOG);
-//    gpio_init(SX_BUSY, IO_MODE_INPUT_ANALOG);
-    gpio_init(SX_BUSY, IO_MODE_INPUT_PU);
+    gpio_init(SX_BUSY, IO_MODE_INPUT_ANALOG);
+//    gpio_init(SX_BUSY, IO_MODE_INPUT_PU);
     gpio_init(SX_RESET, IO_MODE_OUTPUT_PP_LOW);
     gpio_init(SX_TX_EN, IO_MODE_OUTPUT_PP_LOW);
     gpio_init(SX_RX_EN, IO_MODE_OUTPUT_PP_LOW);
 }
 
 IRAM_ATTR bool sx_busy_read(void) { return (gpio_read_activehigh(SX_BUSY)) ? true : false; }
+//IRAM_ATTR bool sx_busy_read(void) { return false; } // we do not use busy pin, so always return not busy to avoid unnecessary waiting
 
 IRAM_ATTR void sx_amp_transmit(void)
 {
@@ -117,7 +118,7 @@ void sx_dio_exti_isr_clearflag(void) {}
 #define SX2_CS_IO                 IO_P47
 #define SX2_BUSY                  IO_P34
 #define SX2_DIO1                  IO_P33
-#define SX2_RESET                 SX_RESET
+#define SX2_RESET                 IO_P1  // Actually SX_RESET, but stubbing in for testing
 #define SX2_RX_EN                 IO_P8
 #define SX2_TX_EN                 IO_P7
 
@@ -129,8 +130,8 @@ void sx2_init_gpio(void)
 {
     gpio_init(SX2_CS_IO, IO_MODE_OUTPUT_PP_HIGH);
     gpio_init(SX2_DIO1, IO_MODE_INPUT_ANALOG);
-//    gpio_init(SX2_BUSY, IO_MODE_INPUT_ANALOG);
-    gpio_init(SX2_BUSY, IO_MODE_INPUT_PU);
+    gpio_init(SX2_BUSY, IO_MODE_INPUT_ANALOG);
+//    gpio_init(SX2_BUSY, IO_MODE_INPUT_PU);
 #if (SX2_RESET != SX_RESET)
     gpio_init(SX2_RESET, IO_MODE_OUTPUT_PP_LOW);
 #endif
@@ -141,6 +142,7 @@ void sx2_init_gpio(void)
 IRAM_ATTR void spib_select(void) { gpio_low(SX2_CS_IO); }
 IRAM_ATTR void spib_deselect(void) { gpio_high(SX2_CS_IO); }
 IRAM_ATTR bool sx2_busy_read(void) { return (gpio_read_activehigh(SX2_BUSY)) ? true : false; }
+//IRAM_ATTR bool sx2_busy_read(void) { return false; } // we do not use busy pin, so always return not busy to avoid unnecessary waiting  
 
 IRAM_ATTR void sx2_amp_transmit(void)
 {
