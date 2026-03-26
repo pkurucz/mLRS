@@ -10,8 +10,8 @@
 
 #define DBG_MAIN(x) x
 #define DBG_MAIN_SLIM(x) x
-#define DEBUG_ENABLED
-#define FAIL_ENABLED
+//#define DEBUG_ENABLED
+//#define FAIL_ENABLED
 
 
 // we set the priorities here to have an overview, SysTick is at 15
@@ -548,36 +548,19 @@ RESTARTCONTROLLER
     // startup sign of life
     leds.Init();
 
-    dbg.putc('a');
-
     // start up sx
     if (!sx.isOk()) { FAILALWAYS(BLINK_RD_GR_OFF, "Sx not ok"); } // fail!
-    dbg.putc('b');
-
     if (!sx2.isOk()) { FAILALWAYS(BLINK_GR_RD_OFF, "Sx2 not ok"); } // fail!
-    dbg.putc('c');
-
     irq_status = irq2_status = 0;
     IF_SX(sx.StartUp(&Config.Sx));
-    dbg.putc('d');
-
     IF_SX2(sx2.StartUp(&Config.Sx2));
-    dbg.putc('e');
-
     bind.Init();
-    dbg.putc('f');
-
     fhss.Init(&Config.Fhss, &Config.Fhss2);
-    dbg.putc('g');
     fhss.Start();
-    dbg.putc('h');
     rfpower.Init();
-    dbg.putc('i');
 
     sx.SetRfFrequency(fhss.GetCurrFreq());
-    dbg.putc('j');
     sx2.SetRfFrequency(fhss.GetCurrFreq2());
-    dbg.putc('k');
 
     link_state = LINK_STATE_RECEIVE;
     connect_state = CONNECT_STATE_LISTEN;
@@ -589,43 +572,30 @@ RESTARTCONTROLLER
     link_rx1_status = link_rx2_status = RX_STATUS_NONE;
     link_tx_status = TX_STATUS_NONE;
     link_task_init();
-    dbg.putc('l');
     doPostReceive2_cnt = 0;
     doPostReceive2 = false;
     frame_missed = false;
 
     stats.Init(Config.LQAveragingPeriod, Config.frame_rate_hz, Config.frame_rate_ms);
-    dbg.putc('m');
     rdiversity.Init();
-    dbg.putc('n');
     tdiversity.Init(Config.frame_rate_ms);
-    dbg.putc('o');
     tarq.Init();
-    dbg.putc('p');
 
     out.Configure(Setup.Rx.OutMode);
-    dbg.putc('q');
     mavlink.Init();
-    dbg.putc('r');
     msp.Init();
-    dbg.putc('s');
     sx_serial.Init();
-    dbg.putc('t');
     fan.SetPower(sx.RfPower_dbm());
-    dbg.putc('u');
     dronecan.Start();
-    dbg.putc('v');
 
     tick_1hz = 0;
     tick_1hz_commensurate = 0;
     resetSysTask(); // helps in avoiding too short first loop
-    dbg.putc('w');
 INITCONTROLLER_END
 
     //-- SysTask handling
 
     if (doSysTask()) {
-        dbg.putc('x');
 
         if (connect_tmo_cnt) {
             connect_tmo_cnt--;
@@ -642,8 +612,8 @@ INITCONTROLLER_END
         dronecan.Tick_ms();
 
         if (!tick_1hz) {
-//            dbg.puts(".");
-            dbg.puts("\nRX: ");
+            dbg.puts(".");
+/*            dbg.puts("\nRX: ");
             dbg.puts(u8toBCD_s(stats.GetLQ_rc())); dbg.putc(',');
             dbg.puts(u8toBCD_s(stats.GetLQ_serial()));
             dbg.puts(" (");
@@ -658,7 +628,7 @@ INITCONTROLLER_END
             dbg.puts(s8toBCD_s(stats.last_snr1)); dbg.puts("; ");
 
             dbg.puts(u16toBCD_s(stats.bytes_transmitted.GetBytesPerSec())); dbg.puts(", ");
-            dbg.puts(u16toBCD_s(stats.bytes_received.GetBytesPerSec())); dbg.puts("; ");
+            dbg.puts(u16toBCD_s(stats.bytes_received.GetBytesPerSec())); dbg.puts("; "); */
         }
     }
 
