@@ -32,14 +32,14 @@
 #define UART_USE_RX_IO            IO_P14
 #endif
 
-#if 0
-#define UARTF_USE_SERIAL2
+#if 1
+#define UARTF_USE_SERIAL
 #define UARTF_BAUD                115200
 #define UARTF_USE_TX_IO           IO_P43
 #define UARTF_USE_RX_IO           IO_P44
 #endif
 
-#define DEVICE_HAS_DEBUG_ON_USB
+//#define DEVICE_HAS_DEBUG_ON_USB
 #if 0
 #define UARTC_USE_SERIAL
 #define UARTC_BAUD                115200
@@ -99,10 +99,7 @@ IRAM_ATTR void sx_amp_receive(void)
     gpio_high(SX_TR_SWITCH);
 }
 
-void sx_dio_init_exti_isroff(void)
-{
-    detachInterrupt(SX_DIO1);
-}
+void sx_dio_init_exti_isroff(void) {} // ESP32-S2: gpio_isr_handler_remove() faults if ISR service not yet installed; nothing to detach at init
 
 void sx_dio_enable_exti_isr(void)
 {
