@@ -11,7 +11,7 @@
 //-------------------------------------------------------
 
 #define DEVICE_HAS_SINGLE_LED_RGB
-#define DEVICE_HAS_NO_DEBUG
+//#define DEVICE_HAS_NO_DEBUG
 //#define DEVICE_HAS_SERIAL_OR_DEBUG
 
 
@@ -33,16 +33,20 @@
 
 //-- SX1: LR11xx & SPI
 
-#define SPI_CS_IO                 IO_P7
-#define SPI_MISO                  IO_P5
-#define SPI_MOSI                  IO_P4
-#define SPI_SCK                   IO_P6
+#define SPI_CS_IO                 IO_P1
+#define SPI_MISO                  IO_P4
+#define SPI_MOSI                  IO_P3
+#define SPI_SCK                   IO_P2
 #define SPI_FREQUENCY             16000000L  // 16 MHz max per datasheet
-#define SX_BUSY                   IO_P3
-#define SX_DIO1                   IO_P1
-#define SX_RESET                  IO_P2
+#define SX_BUSY                   IO_P0
+#define SX_DIO1                   IO_P6      // DIO7
+#define SX_RESET                  IO_P8
 
-//#define SX_USE_REGULATOR_MODE_DCDC
+#define SX_DIO7                   IO_P6
+//#define SX_DIO8                   IO_PB9
+#define SX_DIO9                   IO_P7
+
+#define SX_USE_REGULATOR_MODE_DCDC
 #define SX_USE_IRQ_DIO_NO             LR20XX_DIO_7
 
 IRQHANDLER(void SX_DIO_EXTI_IRQHandler(void);)
