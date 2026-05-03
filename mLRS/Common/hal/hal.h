@@ -262,6 +262,12 @@ Note: Some "high-level" features are set for each device in the device_conf.h fi
 #include "stm32/tx-hal-easysolder-e77-e28-dualband-wle5cc.h"
 #endif
 
+//-- STM32 "nucleo-wl55jc" Eval Boards
+
+#ifdef RX_STM32_NUCLEO_WL55JC
+#include "stm32/rx-hal-stm32-nucleo-wl55jc.h"
+#endif
+
 
 //-------------------------------------------------------
 // ESP Boards

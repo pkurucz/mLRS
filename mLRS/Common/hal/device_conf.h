@@ -395,6 +395,18 @@ The default selection of frequency bands can be overruled by feature defines.
 #endif
 
 
+//-- STM32 "nucleo-wl55jc" Eval Boards
+
+#ifdef RX_STM32_NUCLEO_WL55JC
+  #define DEVICE_NAME "STM32 Nucleo WL55JC "
+  #define DEVICE_IS_RECEIVER
+  #define DEVICE_HAS_SX126x
+  #define FREQUENCY_BAND_868_MHZ
+  #define FREQUENCY_BAND_915_MHZ_FCC
+  #define FREQUENCY_BAND_70_CM_HAM
+#endif
+
+
 //-------------------------------------------------------
 // ESP Boards
 //-------------------------------------------------------
