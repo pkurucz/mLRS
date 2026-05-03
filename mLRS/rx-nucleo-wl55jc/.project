@@ -31,4 +31,21 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>Common</name>
+			<type>2</type>
+			<location>C:/resilio/PK/Electronic_Parts/Code/mLRS/mLRS/Common</location>
+		</link>
+		<link>
+			<name>CommonRx</name>
+			<type>2</type>
+			<location>C:/resilio/PK/Electronic_Parts/Code/mLRS/mLRS/CommonRx</location>
+		</link>
+		<link>
+			<name>modules</name>
+			<type>2</type>
+			<location>C:/resilio/PK/Electronic_Parts/Code/mLRS/mLRS/modules</location>
+		</link>
+	</linkedResources>
 </projectDescription>
