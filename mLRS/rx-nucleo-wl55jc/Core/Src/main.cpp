@@ -49,7 +49,7 @@ UART_HandleTypeDef huart2;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART2_UART_Init(void);
+//static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 int main_main();
 /* USER CODE END PFP */
@@ -88,7 +88,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART2_UART_Init();
+//  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   return main_main();
   /* USER CODE END 2 */
@@ -151,6 +151,7 @@ void SystemClock_Config(void)
   }
 }
 
+#if 0
 /**
   * @brief USART2 Initialization Function
   * @param None
@@ -198,6 +199,7 @@ static void MX_USART2_UART_Init(void)
   /* USER CODE END USART2_Init 2 */
 
 }
+#endif
 
 /**
   * @brief GPIO Initialization Function
@@ -206,8 +208,10 @@ static void MX_USART2_UART_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+#if 0
   LL_EXTI_InitTypeDef EXTI_InitStruct = {0};
   LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
+#endif
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
@@ -216,6 +220,7 @@ static void MX_GPIO_Init(void)
   LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOB);
   LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOC);
 
+#if 0
   /**/
   LL_GPIO_ResetOutputPin(GPIOB, LED1_Pin|LED2_Pin|LED3_Pin);
 
@@ -288,6 +293,7 @@ static void MX_GPIO_Init(void)
 
   /**/
   LL_GPIO_SetPinMode(B2_GPIO_Port, B2_Pin, LL_GPIO_MODE_INPUT);
+#endif
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

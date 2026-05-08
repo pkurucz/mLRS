@@ -91,7 +91,7 @@
 #include "stm32l4xx_hal_flash_ex.h"
 
 #endif
-#ifdef STM32WLE5xx
+#if defined STM32WLE5xx || defined STM32WL55xx
 
 #include "stm32wlxx_ll_cortex.h"
 #include "stm32wlxx_ll_bus.h"

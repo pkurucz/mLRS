@@ -71,6 +71,13 @@
 #define SWUART_TXBUFSIZE          512
 //#define SWUART_TIM_IRQ_PRIORITY   9
 
+#if 0
+#define T_VCP_RX_Pin LL_GPIO_PIN_3
+#define T_VCP_RX_GPIO_Port GPIOA
+#define T_VCP_RXA2_Pin LL_GPIO_PIN_2
+#define T_VCP_RXA2_GPIO_Port GPIOA
+#endif
+
 
 //-- SX12xx & SPI
 
@@ -80,21 +87,23 @@
 #define SX_BUSY                   0 // busy is provided by subghz, we need to define a dummy to fool sx126x_driver lib
 #define SX_HAS_NO_RESET           // SubGHz has no reset, reset is done by spi_init()
 
-#define SX_RX_EN                  IO_PA7
-#define SX_TX_EN                  IO_PA6
+#define FE_CTRL1                  IO_PC4  // 1 = Low Power TX, 0 = High Power TX
+#define FE_CTRL2                  IO_PC5  // 1 = TX, 0 = RX
+#define FE_CTRL3                  IO_PC3  // 1 = Enable T/R Sw. 0 = Disable T/R Sw.
+
+#define SX_TX_EN                  FE_CTRL2
 
 #define SX_DIO_EXTI_IRQn              SUBGHZ_Radio_IRQn
 #define SX_DIO_EXTI_IRQHandler        SUBGHZ_Radio_IRQHandler
 //#define SX_DIO_EXTI_IRQ_PRIORITY    11
 
-#ifdef MLRS_FEATURE_E77_XTAL
-#define SX_USE_CRYSTALOSCILLATOR
-#endif
-
 void sx_init_gpio(void)
 {
-    gpio_init(SX_TX_EN, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_VERYFAST);
-    gpio_init(SX_RX_EN, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_VERYFAST);
+    // FEM / T/R Switch init
+    gpio_init(FE_CTRL1, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_VERYFAST);  // Default to the High Power Tx Path
+    gpio_init(SX_TX_EN, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_VERYFAST);  // Default to RX
+    gpio_init(FE_CTRL3, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_VERYFAST);  // Enable the T/R Sw.
+
 }
 
 bool sx_busy_read(void)
@@ -104,14 +113,16 @@ bool sx_busy_read(void)
 
 void sx_amp_transmit(void)
 {
-    gpio_low(SX_RX_EN);
     gpio_high(SX_TX_EN);
+    gpio_low(FE_CTRL1);   // Select the high power TX path
+    gpio_high(FE_CTRL3);  // Enable the FEM T/R switch
 }
 
 void sx_amp_receive(void)
 {
     gpio_low(SX_TX_EN);
-    gpio_high(SX_RX_EN);
+    gpio_low(FE_CTRL1);   // Select the high power TX path
+    gpio_high(FE_CTRL3);  // Enable the FEM T/R switch
 }
 
 void sx_dio_init_exti_isroff(void)
@@ -138,82 +149,6 @@ void sx_dio_exti_isr_clearflag(void)
     // there is no EXTI_LINE_44 interrupt flag
 }
 
-
-//-- SX12xx II & SPIB
-
-#define SPIB_USE_SPI1             // PA5, PA11, PA12
-#define SPIB_USE_SCK_IO           IO_PA5
-#define SPIB_USE_MISO_IO          IO_PA11
-#define SPIB_USE_MOSI_IO          IO_PA12
-#define SPIB_CS_IO                IO_PB12
-#define SPIB_USE_CLK_LOW_1EDGE    // datasheet says CPHA = 0  CPOL = 0
-#define SPIB_USE_CLOCKSPEED_18MHZ // equals to 12 MHz
-
-#define SX2_RESET                 IO_PB2
-#define SX2_DIO1                  IO_PC13
-#define SX2_BUSY                  IO_PA15
-#define SX2_RX_EN                 IO_PA0
-#define SX2_TX_EN                 IO_PB8
-
-#define SX2_DIO1_SYSCFG_EXTI_PORTx    LL_SYSCFG_EXTI_PORTC
-#define SX2_DIO1_SYSCFG_EXTI_LINEx    LL_SYSCFG_EXTI_LINE13
-#define SX2_DIO_EXTI_LINE_x           LL_EXTI_LINE_13
-#define SX2_DIO_EXTI_IRQn             EXTI15_10_IRQn
-#define SX2_DIO_EXTI_IRQHandler       EXTI15_10_IRQHandler
-//#define SX2_DIO_EXTI_IRQ_PRIORITY   11
-
-void sx2_init_gpio(void)
-{
-    gpio_init(SX2_RESET, IO_MODE_OUTPUT_PP_HIGH, IO_SPEED_VERYFAST);
-    gpio_init(SX2_DIO1, IO_MODE_INPUT_PD, IO_SPEED_VERYFAST);
-    gpio_init(SX2_BUSY, IO_MODE_INPUT_PU, IO_SPEED_VERYFAST);
-    gpio_init(SX2_TX_EN, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_VERYFAST);
-    gpio_init(SX2_RX_EN, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_VERYFAST);
-}
-
-bool sx2_busy_read(void)
-{
-    return (gpio_read_activehigh(SX2_BUSY)) ? true : false;
-}
-
-void sx2_amp_transmit(void)
-{
-    gpio_low(SX2_RX_EN);
-    gpio_high(SX2_TX_EN);
-}
-
-void sx2_amp_receive(void)
-{
-    gpio_low(SX2_TX_EN);
-    gpio_high(SX2_RX_EN);
-}
-
-void sx2_dio_init_exti_isroff(void)
-{
-    LL_SYSCFG_SetEXTISource(SX2_DIO1_SYSCFG_EXTI_PORTx, SX2_DIO1_SYSCFG_EXTI_LINEx);
-
-    // let's not use LL_EXTI_Init(), but let's do it by hand, is easier to allow enabling isr later
-    LL_EXTI_DisableEvent_0_31(SX2_DIO_EXTI_LINE_x);
-    LL_EXTI_DisableIT_0_31(SX2_DIO_EXTI_LINE_x);
-    LL_EXTI_DisableFallingTrig_0_31(SX2_DIO_EXTI_LINE_x);
-    LL_EXTI_EnableRisingTrig_0_31(SX2_DIO_EXTI_LINE_x);
-
-    NVIC_SetPriority(SX2_DIO_EXTI_IRQn, SX2_DIO_EXTI_IRQ_PRIORITY);
-    NVIC_EnableIRQ(SX2_DIO_EXTI_IRQn);
-}
-
-void sx2_dio_enable_exti_isr(void)
-{
-    LL_EXTI_ClearFlag_0_31(SX2_DIO_EXTI_LINE_x);
-    LL_EXTI_EnableIT_0_31(SX2_DIO_EXTI_LINE_x);
-}
-
-void sx2_dio_exti_isr_clearflag(void)
-{
-    LL_EXTI_ClearFlag_0_31(SX2_DIO_EXTI_LINE_x);
-}
-
-
 //-- Out port
 
 void out_init_gpio(void)
@@ -237,7 +172,7 @@ void out_set_inverted(void)
 
 //-- Button
 
-#define BUTTON                    IO_PA1
+#define BUTTON                    IO_PA0
 
 void button_init(void)
 {
@@ -249,16 +184,17 @@ bool button_pressed(void)
     return gpio_read_activelow(BUTTON);
 }
 
-
 //-- LEDs
 
-#define LED_GREEN                 IO_PB4
-#define LED_RED                   IO_PB3
+#define LED_BLUE                  IO_PB15 // LED1
+#define LED_GREEN                 IO_PB9  // LED2
+#define LED_RED                   IO_PB11  // LED3
 
 void leds_init(void)
 {
     gpio_init(LED_GREEN, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_DEFAULT);
     gpio_init(LED_RED, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_DEFAULT);
+    gpio_init(LED_BLUE, IO_MODE_OUTPUT_PP_LOW, IO_SPEED_DEFAULT);
 }
 
 void led_green_off(void) { gpio_low(LED_GREEN); }
@@ -268,6 +204,10 @@ void led_green_toggle(void) { gpio_toggle(LED_GREEN); }
 void led_red_off(void) { gpio_low(LED_RED); }
 void led_red_on(void) { gpio_high(LED_RED); }
 void led_red_toggle(void) { gpio_toggle(LED_RED); }
+
+void led_white_off(void) { gpio_low(LED_BLUE); }
+void led_white_on(void) { gpio_high(LED_BLUE); }
+void led_white_toggle(void) { gpio_toggle(LED_BLUE); }
 
 
 //-- POWER
