@@ -166,3 +166,16 @@
 #ifdef RX_PKURUCZ_900_ESP32S2
 #include "rx-hal-pkurucz-900-esp32s2.h"
 #endif
+
+#ifdef RX_TTGO_LORA_V2_0_433_ESP32
+#include "rx-hal-ttgo-lora-v2_0-433-esp32.h"
+#endif
+
+#ifdef RX_TTGO_LORA_V2_0_900_ESP32
+#include "rx-hal-ttgo-lora-v2_0-900-esp32.h"
+#endif
+
+#ifdef TX_TTGO_LORA_V2_0_900_ESP32
+#include "tx-hal-ttgo-lora-v2_0-900-esp32.h"
+#endif
+
