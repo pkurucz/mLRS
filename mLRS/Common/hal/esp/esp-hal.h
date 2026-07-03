@@ -41,6 +41,10 @@
 #include "rx-hal-generic-s2-lr2021-esp32s2.h"
 #endif
 
+#ifdef RX_ELRS_GENERIC_S3_LR2021_ESP32S3
+#include "rx-hal-generic-s3-lr2021-esp32s3.h"
+#endif
+
 //-- Generic 868/915 MHz ELRS devices with overlays or other variations
 
 #ifdef RX_ELRS_RADIOMASTER_BR3_900_ESP8285
